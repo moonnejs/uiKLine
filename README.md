@@ -1,3 +1,3 @@
 # uiKLine
-UI Tool for KLine Displaying
+用pyqtgraph做的K线工具
 ![](https://raw.githubusercontent.com/moonnejs/uiKLine/master/KLine.png)
