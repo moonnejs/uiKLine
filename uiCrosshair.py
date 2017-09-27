@@ -83,7 +83,7 @@ class Crosshair(object):
                 self.hLines[i].setPos(topLeft.y()+abs(topLeft.y()))
 
     #----------------------------------------------------------------------
-    def textPriceSetY(self,yAxis):
+    def plotPrice(self,yAxis):
         """价格位置设置"""
         for i in range(3):
             if self.showHLine[i]:
@@ -110,30 +110,17 @@ class Crosshair(object):
             return
         self.xAxis = xAxis
         self.vhLinesSetXY(xAxis,yAxis)
-        self.textPriceSetY(yAxis)
-        self.tickDatetimeSetX(xAxis) 
+        self.plotPrice(yAxis)
+        self.plotInfo(xAxis) 
         
-    #----------------------------------------------------------------------
-    def tickDatetimeSetX(self,xAxis):
-        """
-        默认计算方式，用datetimeNum标记x轴
-        根据某个view中鼠标所在位置的x坐标获取其所在tick的time，xAxis可以是index，也可是一datetime转换而得到的datetimeNum
-        return:str
-        """        
-        yAxis = 0
-        tickDatetime = xAxis
-        yAxis = self.datas.iloc[int(xAxis)]['close'] if not self.datas is None else 0
-
-        if self.master.axisTime:
-            axisTime = self.master.axisTime
-            self.plotInfo(xAxis)        
-    
     #----------------------------------------------------------------------
     def plotInfo(self,xAxis):        
         """
-        被嵌入的plotWidget在需要的时候通过调用此方法显示lastprice和lasttime
-        比如，在每个tick到来的时候
+        被嵌入的plotWidget在需要的时候通过调用此方法显示K线信息
         """
+        if self.datas is None:
+            return
+        # 获取K线数据
         tickDatetime    = self.datas.iloc[int(xAxis)].name
         volume          = self.datas.iloc[int(xAxis)]['volume']
         openInterest    = self.datas.iloc[int(xAxis)]['openInterest']
@@ -151,7 +138,8 @@ class Crosshair(object):
             datetimeText = "not set."
             dateText     = "not set."
             timeText     = "not set."
-
+        
+        # 和上一个收盘价比较，决定K线信息的字符颜色
         openText  = "%.3f" % openPrice
         closeText = "%.3f" % closePrice
         highText  = "%.3f" % highPrice
@@ -180,7 +168,8 @@ class Crosshair(object):
                                 <span style="color: white;  font-size: 16px;">仓差</span><br>\
                                 <span style="color: yellow; font-size: 16px;">%f</span><br>\
                             </div>'\
-                                % (dateText,timeText,cOpen,openText,cHigh,highText,cLow,lowText,cClose,closeText,volume,openInterest))             
+                                % (dateText,timeText,cOpen,openText,cHigh,highText,\
+                                    cLow,lowText,cClose,closeText,volume,openInterest))             
         self.__textDate.setHtml(
                             '<div style="text-align: center">\
                                 <span style="color: yellow; font-size: 24px;">%s</span>\
@@ -192,14 +181,16 @@ class Crosshair(object):
                                 <span style="color: white; font-size: 20px;">VOL : %.3f</span>\
                             </div>'\
                                 % (volume))   
-
+        
+        # K线子图，左上角显示
         leftAxis = self.views[0].getAxis('left')
         leftAxisWidth = leftAxis.width()
         topLeft = self.views[0].vb.mapSceneToView(QtCore.QPointF(self.rects[0].left()+leftAxisWidth,self.rects[0].top()))
         x = topLeft.x()
         y = topLeft.y()
         self.__textInfo.setPos(x,y)           
-
+        
+        # 成交量子图，右上角显示
         rightAxis = self.views[1].getAxis('right')
         rightAxisWidth = rightAxis.width()
         topRight = self.views[1].vb.mapSceneToView(QtCore.QPointF(self.rects[1].right()-rightAxisWidth,self.rects[1].top()))
@@ -207,12 +198,14 @@ class Crosshair(object):
         y = topRight.y()
         self.__textVolume.setPos(x,y)           
 
+        # X坐标时间显示
         rectTextDate = self.__textDate.boundingRect()         
         rectTextDateHeight = rectTextDate.height()
         bottomAxis = self.views[2].getAxis('bottom')            
         bottomAxisHeight = bottomAxis.height()
         bottomRight = self.views[2].vb.mapSceneToView(QtCore.QPointF(self.rects[2].width(),\
                 self.rects[2].bottom()-(bottomAxisHeight+rectTextDateHeight)))
+        # 修改对称方式防止遮挡
         if xAxis > self.master.index:
             self.__textDate.anchor = Point((1,0))
         else:
