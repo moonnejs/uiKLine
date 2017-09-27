@@ -336,11 +336,11 @@ class KLineWidget(KeyWraper):
         """更新数据，用于Y坐标自适应"""
         self.crosshair.datas = datas
         def viewXRangeChanged(low,high,self):
-            if len(datas)>0:
-                vRange = self.viewRange()
-                xmin = max(0,int(vRange[0][0]))
-                xmax = max(0,int(vRange[0][1]))
-                xmax = min(xmax,len(datas))
+            vRange = self.viewRange()
+            xmin = max(0,int(vRange[0][0]))
+            xmax = max(0,int(vRange[0][1]))
+            xmax = min(xmax,len(datas))
+            if len(datas)>0 and xmax > xmin:
                 ymin = min(datas.iloc[xmin:xmax][low])
                 ymax = max(datas.iloc[xmin:xmax][high])
                 self.setRange(yRange = (ymin,ymax))
@@ -467,19 +467,27 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def onNxt(self):
         """跳转到下一个开平仓点"""
-        if len(signals)>0 and not self.index is None:
+        if len(self.signals)>0 and not self.index is None:
             datalen = len(self.signals)-1
+            self.index+=1
             while self.signals[self.index] == 0 and self.index < datalen:
                 self.index+=1
             self.refresh()
+            x = self.index
+            y = self.datas.iloc[x]['close']
+            self.crosshair.moveTo(x,y)
 
     #----------------------------------------------------------------------
     def onPre(self):
         """跳转到上一个开平仓点"""
-        if  len(signals)>0 and not self.index is None:
+        if  len(self.signals)>0 and not self.index is None:
+            self.index-=1
             while self.signals[self.index] == 0 and self.index > 1:
                 self.index-=1
             self.refresh()
+            x = self.index
+            y = self.datas.iloc[x]['close']
+            self.crosshair.moveTo(x,y)
 
     #----------------------------------------------------------------------
     def onDown(self):
