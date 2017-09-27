@@ -42,6 +42,7 @@ class Crosshair(object):
         self.__textDate.setZValue(2)
         self.__textInfo.setZValue(2)
         self.__textVolume.setZValue(2)
+        self.__textInfo.border = pg.mkPen(color=(230, 255, 0, 255), width=1.2)
         
         for i in range(3):
             self.textPrices[i].setZValue(2)
@@ -72,6 +73,16 @@ class Crosshair(object):
                 self.moveTo(xAxis,yAxis)
 
     #----------------------------------------------------------------------
+    def moveTo(self,xAxis,yAxis):
+        self.rects  = [self.views[i].sceneBoundingRect() for i in range(3)]
+        if not xAxis or not yAxis:
+            return
+        self.xAxis = xAxis
+        self.vhLinesSetXY(xAxis,yAxis)
+        self.plotPrice(yAxis)
+        self.plotInfo(xAxis) 
+
+    #----------------------------------------------------------------------
     def vhLinesSetXY(self,xAxis,yAxis):
         """水平和竖线位置设置"""
         for i in range(3):
@@ -92,7 +103,7 @@ class Crosshair(object):
                 topRight = self.views[i].vb.mapSceneToView(QtCore.QPointF(self.rects[i].right()-rightAxisWidth,self.rects[i].top()))
                 self.textPrices[i].setHtml(
                          '<div style="text-align: right">\
-                             <span style="color: yellow; font-size: 24px;">\
+                             <span style="color: yellow; font-size: 20px;">\
                                %0.3f\
                              </span>\
                          </div>'\
@@ -103,16 +114,6 @@ class Crosshair(object):
                 self.textPrices[i].setPos(topRight.x(),topRight.y()+abs(topRight.y()))
 
 
-    #----------------------------------------------------------------------
-    def moveTo(self,xAxis,yAxis):
-        self.rects  = [self.views[i].sceneBoundingRect() for i in range(3)]
-        if not xAxis or not yAxis:
-            return
-        self.xAxis = xAxis
-        self.vhLinesSetXY(xAxis,yAxis)
-        self.plotPrice(yAxis)
-        self.plotInfo(xAxis) 
-        
     #----------------------------------------------------------------------
     def plotInfo(self,xAxis):        
         """
@@ -150,7 +151,7 @@ class Crosshair(object):
         cLow      = 'red' if lowPrice   > preClosePrice else 'green'
             
         self.__textInfo.setHtml(
-                            u'<div style="text-align: center; background-color:#000; border:2px solid #FFFFFF;">\
+                            u'<div style="text-align: center; background-color:#000">\
                                 <span style="color: white;  font-size: 16px;">日期</span><br>\
                                 <span style="color: yellow; font-size: 16px;">%s</span><br>\
                                 <span style="color: white;  font-size: 16px;">时间</span><br>\
@@ -164,15 +165,15 @@ class Crosshair(object):
                                 <span style="color: white;  font-size: 16px;">收盘</span><br>\
                                 <span style="color: %s;     font-size: 16px;">%s</span><br>\
                                 <span style="color: white;  font-size: 16px;">成交量</span><br>\
-                                <span style="color: yellow; font-size: 16px;">%f</span><br>\
+                                <span style="color: yellow; font-size: 16px;">%.3f</span><br>\
                                 <span style="color: white;  font-size: 16px;">仓差</span><br>\
-                                <span style="color: yellow; font-size: 16px;">%f</span><br>\
+                                <span style="color: yellow; font-size: 16px;">%.3f</span><br>\
                             </div>'\
                                 % (dateText,timeText,cOpen,openText,cHigh,highText,\
                                     cLow,lowText,cClose,closeText,volume,openInterest))             
         self.__textDate.setHtml(
                             '<div style="text-align: center">\
-                                <span style="color: yellow; font-size: 24px;">%s</span>\
+                                <span style="color: yellow; font-size: 20px;">%s</span>\
                             </div>'\
                                 % (datetimeText))   
 
