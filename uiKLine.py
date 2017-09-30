@@ -151,14 +151,6 @@ class CustomViewBox(pg.ViewBox):
         if ev.button() == QtCore.Qt.RightButton:
             self.autoRange()
 
-    # 鼠标拖动        
-    #----------------------------------------------------------------------
-    def mouseDragEvent(self, ev):
-        if ev.button() == QtCore.Qt.RightButton:
-            ev.ignore()
-        else:
-            pg.ViewBox.mouseDragEvent(self, ev)
-
 
 ########################################################################
 # 时间序列，横坐标支持
@@ -172,6 +164,7 @@ class MyStringAxis(pg.AxisItem):
         pg.AxisItem.__init__(self, *args, **kwargs)
         self.minVal = 0 
         self.maxVal = 0
+        self.xdict  = xdict
         self.x_values = np.asarray(xdict.keys())
         self.x_strings = xdict.values()
         self.setPen(color=(255, 255, 255, 255), width=0.8)
@@ -180,8 +173,9 @@ class MyStringAxis(pg.AxisItem):
     # 更新坐标映射表
     #----------------------------------------------------------------------
     def update_xdict(self, xdict):
-        self.x_values = np.asarray(xdict.keys())
-        self.x_strings = xdict.values()
+        self.xdict.update(xdict)
+        self.x_values  = np.asarray(self.xdict.keys())
+        self.x_strings = self.xdict.values()
 
     # 将原始横坐标转换为时间字符串,第一个坐标包含日期
     #----------------------------------------------------------------------
@@ -206,52 +200,83 @@ class CandlestickItem(pg.GraphicsObject):
     # 初始化
     #----------------------------------------------------------------------
     def __init__(self, data):
+        """初始化"""
         pg.GraphicsObject.__init__(self)
-        self.data = data                # 数据格式: [ (time, open, close, low, high),...]
-        w = 0.4
+        # 数据格式: [ (time, open, close, low, high),...]
+        self.data = data
+        # 只重画部分图形，大大提高界面更新速度
+        self.setFlag(self.ItemUsesExtendedStyleOption)
         # 画笔和画刷
-        self.bPen   = pg.mkPen(color=(0, 240, 240, 255), width=w*2)
-        self.bBrush = pg.mkBrush((0, 240, 240, 255))
-        self.rPen   = pg.mkPen(color=(255, 60, 60, 255), width=w*2)
-        self.rBrush = pg.mkBrush((255, 60, 60, 255))
+        w = 0.4
+        self.offset   = 0
+        self.low      = 0
+        self.high     = 1
+        self.picture  = QtGui.QPicture()
+        self.pictures = []
+        self.bPen     = pg.mkPen(color=(0, 240, 240, 255), width=w*2)
+        self.bBrush   = pg.mkBrush((0, 240, 240, 255))
+        self.rPen     = pg.mkPen(color=(255, 60, 60, 255), width=w*2)
+        self.rBrush   = pg.mkBrush((255, 60, 60, 255))
         self.rBrush.setStyle(Qt.NoBrush)
         # 刷新K线
         self.generatePicture(self.data)          
 
-    # 重画K线
+
+    # 画K线
     #----------------------------------------------------------------------
-    def generatePicture(self,data=None):
-        # 提高调用速度
+    def generatePicture(self,data=None,redraw=False):
+        """重新生成图形对象"""
+        # 重画或者只更新最后一个K线
+        if redraw:
+            self.pictures = []
+        elif self.pictures:
+            self.pictures.pop()
+        w = 0.4
         bPen   = self.bPen
         bBrush = self.bBrush
         rPen   = self.rPen
         rBrush = self.rBrush
-        self.picture = QtGui.QPicture()
-        p = QtGui.QPainter(self.picture)
-        w = 0.4
+        low,high = (data[0]['low'],data[0]['high']) if len(data)>0 else (0,1)
         for (t, open0, close0, low0, high0) in data:
-            # 下跌蓝色（实心）, 上涨红色（空心）
-            pen,brush,pmin,pmax = (bPen,bBrush,close0,open0)\
-                if open0 > close0 else (rPen,rBrush,open0,close0)
-            p.setPen(pen)  
-            p.setBrush(brush)
-            # 画K线方块和上下影线
-            p.drawRect(QtCore.QRectF(t-w, open0, w*2, close0-open0))
-            if pmin  > low0:
-                p.drawLine(QtCore.QPointF(t,low0), QtCore.QPointF(t, pmin))
-            if high0 > pmax:
-                p.drawLine(QtCore.QPointF(t,pmax), QtCore.QPointF(t, high0))
-        p.end()
+            if t >= len(self.pictures):
+                low,high = (min(low,low0),max(high,high0))
+                picture = QtGui.QPicture()
+                p = QtGui.QPainter(picture)
+                # 下跌蓝色（实心）, 上涨红色（空心）
+                pen,brush,pmin,pmax = (bPen,bBrush,close0,open0)\
+                    if open0 > close0 else (rPen,rBrush,open0,close0)
+                p.setPen(pen)  
+                p.setBrush(brush)
+                # 画K线方块和上下影线
+                if open0 == close0:
+                    p.drawLine(QtCore.QPointF(t-w,open0), QtCore.QPointF(t+w, close0))
+                else:
+                    p.drawRect(QtCore.QRectF(t-w, open0, w*2, close0-open0))
+                if pmin  > low0:
+                    p.drawLine(QtCore.QPointF(t,low0), QtCore.QPointF(t, pmin))
+                if high0 > pmax:
+                    p.drawLine(QtCore.QPointF(t,pmax), QtCore.QPointF(t, high0))
+                p.end()
+                self.pictures.append(picture)
+        self.low,self.high = low,high
+
+    # 手动重画
+    #----------------------------------------------------------------------
+    def update(self):
+        if not self.scene() is None:
+            self.scene().update()
 
     # 自动重画
     #----------------------------------------------------------------------
-    def paint(self, p, *args):
-        p.drawPicture(0, 0, self.picture)
+    def paint(self, p, o, w):
+        rect = o.exposedRect
+        xmin,xmax = (max(0,int(rect.left())),min(len(self.pictures),int(rect.right())))
+        [p.drawPicture(0, 0, pic) for pic in self.pictures[xmin:xmax]]
 
     # 定义边界
     #----------------------------------------------------------------------
     def boundingRect(self):
-        return QtCore.QRectF(self.picture.boundingRect())
+        return QtCore.QRectF(0,self.low,len(self.pictures),(self.high-self.low))
 
 
 ########################################################################
@@ -281,8 +306,8 @@ class KLineWidget(KeyWraper):
         self.countK   = 60      # 显示的Ｋ线范围
 
         # 缓存数据
-        self.datas    = pd.DataFrame()
-        self.signals  = pd.DataFrame()
+        self.datas    = []
+        self.signals  = []
         self.listBar  = []
         self.listVol  = []
         self.listHigh = []
@@ -300,6 +325,8 @@ class KLineWidget(KeyWraper):
         # 调用函数
         self.initUi()
 
+    #----------------------------------------------------------------------
+    #  初始化相关 
     #----------------------------------------------------------------------
     def initUi(self):
         """初始化界面"""
@@ -330,46 +357,6 @@ class KLineWidget(KeyWraper):
         # 初始化完成
         self.initCompleted = True    
 
-    # Y坐标自适应,数据使用pd.DataFrame格式 cols : datetime, open, close, low, high
-    #----------------------------------------------------------------------
-    def resignData(self,datas):
-        """更新数据，用于Y坐标自适应"""
-        self.crosshair.datas = datas
-        def viewXRangeChanged(low,high,self):
-            vRange = self.viewRange()
-            xmin = max(0,int(vRange[0][0]))
-            xmax = max(0,int(vRange[0][1]))
-            xmax = min(xmax,len(datas))
-            if len(datas)>0 and xmax > xmin:
-                ymin = min(datas.iloc[xmin:xmax][low])
-                ymax = max(datas.iloc[xmin:xmax][high])
-                self.setRange(yRange = (ymin,ymax))
-            else:
-                self.setRange(yRange = (0,1))
-
-        view = self.pwKL.getViewBox()
-        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'low','high'))
-
-        view = self.pwVol.getViewBox()
-        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'volume','volume'))
-
-        view = self.pwOI.getViewBox()
-        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'openInterest','openInterest'))
-
-    #----------------------------------------------------------------------
-    def clearData(self):
-        """清空数据"""
-        # 清空数据，重新画图
-        self.time_index = []
-        self.listBar = []
-        self.listVol = []
-        self.listLow = []
-        self.listHigh = []
-        self.listOpenInterest = []
-        self.listSig = []
-        self.arrows = []
-        self.datas = None
-
     #----------------------------------------------------------------------
     def makePI(self,name):
         """生成PlotItem对象"""
@@ -395,7 +382,7 @@ class KLineWidget(KeyWraper):
         self.volume = CandlestickItem(self.listVol)
         self.pwVol.addItem(self.volume)
         self.pwVol.setMaximumHeight(150)
-        self.pwVol.setXLink('PlotKL')
+        self.pwVol.setXLink('PlotOI')
         self.pwVol.hideAxis('bottom')
 
         self.lay_KL.nextRow()
@@ -407,6 +394,7 @@ class KLineWidget(KeyWraper):
         self.pwKL = self.makePI('PlotKL')
         self.candle = CandlestickItem(self.listBar)
         self.pwKL.addItem(self.candle)
+        self.pwKL.setXLink('PlotOI')
         self.pwKL.hideAxis('bottom')
 
         self.lay_KL.nextRow()
@@ -416,30 +404,31 @@ class KLineWidget(KeyWraper):
     def initplotOI(self):
         """初始化持仓量子图"""
         self.pwOI = self.makePI('PlotOI')
-        self.pwOI.setXLink('PlotKL') 
         self.curveOI = self.pwOI.plot()
 
         self.lay_KL.nextRow()
         self.lay_KL.addItem(self.pwOI)
 
     #----------------------------------------------------------------------
-    def plotVol(self):
+    #  画图相关 
+    #----------------------------------------------------------------------
+    def plotVol(self,redraw=False,xmin=0,xmax=-1):
         """重画成交量子图"""
         if self.initCompleted:
-            self.volume.generatePicture(self.listVol)   # 画成交量子图
+            self.volume.generatePicture(self.listVol[xmin:xmax],redraw)   # 画成交量子图
 
     #----------------------------------------------------------------------
-    def plotKline(self):
+    def plotKline(self,redraw=False,xmin=0,xmax=-1):
         """重画K线子图"""
         if self.initCompleted:
-            self.candle.generatePicture(self.listBar)   # 画K线
+            self.candle.generatePicture(self.listBar[xmin:xmax],redraw)   # 画K线
             self.plotMark()                             # 显示开平仓信号位置
 
     #----------------------------------------------------------------------
-    def plotOI(self):
+    def plotOI(self,xmin=0,xmax=-1):
         """重画持仓量子图"""
         if self.initCompleted:
-            self.curveOI.setData(self.listOpenInterest, pen='w', name="OpenInterest")
+            self.curveOI.setData(self.listOpenInterest[xmin:xmax]+[0], pen='w', name="OpenInterest")
 
 
     #----------------------------------------------------------------------
@@ -456,98 +445,6 @@ class KLineWidget(KeyWraper):
             self.sigPlots[sig].setData(datas[sig] , pen=(255, 255, 255), name=sig)
 
     #----------------------------------------------------------------------
-    def refresh(self):
-        """刷新三个子图"""   
-        datas   = self.datas
-        minutes = int(self.countK/2)
-        xmin    = max(0,self.index-minutes)
-        xmax    = xmin+2*minutes
-        self.pwKL.setRange(xRange = (xmin,xmax))
-
-    #----------------------------------------------------------------------
-    def onNxt(self):
-        """跳转到下一个开平仓点"""
-        if len(self.signals)>0 and not self.index is None:
-            datalen = len(self.signals)-1
-            self.index+=1
-            while self.signals[self.index] == 0 and self.index < datalen:
-                self.index+=1
-            self.refresh()
-            x = self.index
-            y = self.datas.iloc[x]['close']
-            self.crosshair.moveTo(x,y)
-
-    #----------------------------------------------------------------------
-    def onPre(self):
-        """跳转到上一个开平仓点"""
-        if  len(self.signals)>0 and not self.index is None:
-            self.index-=1
-            while self.signals[self.index] == 0 and self.index > 1:
-                self.index-=1
-            self.refresh()
-            x = self.index
-            y = self.datas.iloc[x]['close']
-            self.crosshair.moveTo(x,y)
-
-    #----------------------------------------------------------------------
-    def onDown(self):
-        """放大显示区间"""
-        self.countK = min(len(self.datas),int(self.countK*1.2)+1)
-        self.refresh()
-        if len(self.datas)>0:
-            x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
-            x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
-            y = self.datas.iloc[x]['close']
-            self.crosshair.moveTo(x,y)
-
-    #----------------------------------------------------------------------
-    def onUp(self):
-        """缩小显示区间"""
-        self.countK = max(3,int(self.countK/1.2)-1)
-        self.refresh()
-        if len(self.datas)>0:
-            x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
-            x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
-            y = self.datas.iloc[x]['close']
-            self.crosshair.moveTo(x,y)
-
-    #----------------------------------------------------------------------
-    def onLeft(self):
-        """向左移动"""
-        if len(self.datas)>0:
-            x = int(self.crosshair.xAxis)-1
-            y = self.datas.iloc[x]['close']
-            if x <= self.index-self.countK/2+2 and self.index > 1:
-                self.index -= 1
-                self.refresh()
-            self.crosshair.moveTo(x,y)
-
-    #----------------------------------------------------------------------
-    def onRight(self):
-        """向右移动"""
-        if len(self.datas)>0:
-            x = int(self.crosshair.xAxis)+1
-            y = self.datas.iloc[x]['close']
-            if x >= self.index+int(self.countK/2)-2:
-                self.index += 1
-                self.refresh()
-            self.crosshair.moveTo(x,y)
-    
-    #----------------------------------------------------------------------
-    def onRClick(self,pos):
-        """右键单击回调"""
-        pass
-
-    #----------------------------------------------------------------------
-    def onPaint(self):
-        """界面刷新回调"""
-        view = self.pwKL.getViewBox()
-        vRange = view.viewRange()
-        xmin = max(0,int(vRange[0][0]))
-        xmax = max(0,int(vRange[0][1]))
-        self.index  = int((xmin+xmax)/2)+1
-
-    #----------------------------------------------------------------------
     def plotMark(self):
         """显示开平仓信号"""
         # 检查是否有数据
@@ -562,43 +459,265 @@ class KLineWidget(KeyWraper):
                 continue
             # 买信号
             elif self.listSig[i] > 0:
-                arrow = pg.ArrowItem(pos=(i, self.datas.iloc[i]['low']),  angle=90, brush=(255, 0, 0))
+                arrow = pg.ArrowItem(pos=(i, self.datas[i]['low']),  angle=90, brush=(255, 0, 0))
             # 卖信号
             elif self.listSig[i] < 0:
-                arrow = pg.ArrowItem(pos=(i, self.datas.iloc[i]['high']), angle=-90, brush=(0, 255, 0))
+                arrow = pg.ArrowItem(pos=(i, self.datas[i]['high']), angle=-90, brush=(0, 255, 0))
             self.pwKL.addItem(arrow)
             self.arrows.append(arrow)
 
-    # 载入数据，pd.DataFrame格式，cols : datetime, open, close, low, high
+    #----------------------------------------------------------------------
+    def updateAll(self):
+        """
+        手动更新所有K线图形，K线播放模式下需要
+        """
+        datas = self.datas
+        self.volume.update()
+        self.candle.update()
+        def update(view,low,high):
+            vRange = view.viewRange()
+            xmin = max(0,int(vRange[0][0]))
+            xmax = max(0,int(vRange[0][1]))
+            xmax = min(xmax,len(datas))
+            if len(datas)>0 and xmax > xmin:
+                ymin = min(datas[xmin:xmax][low])
+                ymax = max(datas[xmin:xmax][high])
+                view.setRange(yRange = (ymin,ymax))
+            else:
+                view.setRange(yRange = (0,1))
+        update(self.pwKL.getViewBox(),'low','high')
+        update(self.pwVol.getViewBox(),'volume','volume')
+
+    #----------------------------------------------------------------------
+    def plotAll(self,redraw=True,xMin=0,xMax=-1):
+        """
+        重画所有界面
+        redraw ：False=重画最后一根K线; True=重画所有
+        xMin,xMax : 数据范围
+        """
+        xMax = len(self.datas) if xMax < 0 else xMax
+        self.countK = xMax-xMin
+        self.index = int((xMax+xMin)/2)
+        self.pwOI.setLimits(xMin=xMin,xMax=xMax)
+        self.pwKL.setLimits(xMin=xMin,xMax=xMax)
+        self.pwVol.setLimits(xMin=xMin,xMax=xMax)
+        self.plotKline(redraw,xMin,xMax)                       # K线图
+        self.plotVol(redraw,xMin,xMax)                         # K线副图，成交量
+        self.plotOI(0,len(self.datas))                         # K线副图，持仓量
+        self.refresh()
+
+    #----------------------------------------------------------------------
+    def refresh(self):
+        """
+        刷新三个子图的现实范围
+        """   
+        datas   = self.datas
+        minutes = int(self.countK/2)
+        xmin    = max(0,self.index-minutes)
+        xmax    = xmin+2*minutes
+        self.pwOI.setRange(xRange = (xmin,xmax))
+        self.pwKL.setRange(xRange = (xmin,xmax))
+        self.pwVol.setRange(xRange = (xmin,xmax))
+
+    #----------------------------------------------------------------------
+    #  快捷键相关 
+    #----------------------------------------------------------------------
+    def onNxt(self):
+        """跳转到下一个开平仓点"""
+        if len(self.signals)>0 and not self.index is None:
+            datalen = len(self.signals)-1
+            self.index+=1
+            while self.signals[self.index] == 0 and self.index < datalen:
+                self.index+=1
+            self.refresh()
+            x = self.index
+            y = self.datas[x]['close']
+            self.crosshair.signal.emit((x,y))
+
+    #----------------------------------------------------------------------
+    def onPre(self):
+        """跳转到上一个开平仓点"""
+        if  len(self.signals)>0 and not self.index is None:
+            self.index-=1
+            while self.signals[self.index] == 0 and self.index > 1:
+                self.index-=1
+            self.refresh()
+            x = self.index
+            y = self.datas[x]['close']
+            self.crosshair.signal.emit((x,y))
+
+    #----------------------------------------------------------------------
+    def onDown(self):
+        """放大显示区间"""
+        self.countK = min(len(self.datas),int(self.countK*1.2)+1)
+        self.refresh()
+        if len(self.datas)>0:
+            x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
+            x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
+            y = self.datas[x][2]
+            self.crosshair.signal.emit((x,y))
+
+    #----------------------------------------------------------------------
+    def onUp(self):
+        """缩小显示区间"""
+        self.countK = max(3,int(self.countK/1.2)-1)
+        self.refresh()
+        if len(self.datas)>0:
+            x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
+            x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
+            y = self.datas[x]['close']
+            self.crosshair.signal.emit((x,y))
+
+    #----------------------------------------------------------------------
+    def onLeft(self):
+        """向左移动"""
+        if len(self.datas)>0 and int(self.crosshair.xAxis)>2:
+            x = int(self.crosshair.xAxis)-1
+            y = self.datas[x]['close']
+            if x <= self.index-self.countK/2+2 and self.index>1:
+                self.index -= 1
+                self.refresh()
+            self.crosshair.signal.emit((x,y))
+
+    #----------------------------------------------------------------------
+    def onRight(self):
+        """向右移动"""
+        if len(self.datas)>0 and int(self.crosshair.xAxis)<len(self.datas)-1:
+            x = int(self.crosshair.xAxis)+1
+            y = self.datas[x]['close']
+            if x >= self.index+int(self.countK/2)-2:
+                self.index += 1
+                self.refresh()
+            self.crosshair.signal.emit((x,y))
+    
+    #----------------------------------------------------------------------
+    def onRClick(self,pos):
+        """右键单击回调"""
+        pass
+
+    #----------------------------------------------------------------------
+    # 界面回调相关
+    #----------------------------------------------------------------------
+    def onPaint(self):
+        """界面刷新回调"""
+        view = self.pwKL.getViewBox()
+        vRange = view.viewRange()
+        xmin = max(0,int(vRange[0][0]))
+        xmax = max(0,int(vRange[0][1]))
+        self.index  = int((xmin+xmax)/2)+1
+
+    #----------------------------------------------------------------------
+    def resignData(self,datas):
+        """更新数据，用于Y坐标自适应"""
+        self.crosshair.datas = datas
+        def viewXRangeChanged(low,high,self):
+            vRange = self.viewRange()
+            xmin = max(0,int(vRange[0][0]))
+            xmax = max(0,int(vRange[0][1]))
+            xmax = min(xmax,len(datas))
+            if len(datas)>0 and xmax > xmin:
+                ymin = min(datas[xmin:xmax][low])
+                ymax = max(datas[xmin:xmax][high])
+                self.setRange(yRange = (ymin,ymax))
+            else:
+                self.setRange(yRange = (0,1))
+
+        view = self.pwKL.getViewBox()
+        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'low','high'))
+
+        view = self.pwVol.getViewBox()
+        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'volume','volume'))
+
+        view = self.pwOI.getViewBox()
+        view.sigXRangeChanged.connect(partial(viewXRangeChanged,'openInterest','openInterest'))
+
+    #----------------------------------------------------------------------
+    # 数据相关
+    #----------------------------------------------------------------------
+    def clearData(self):
+        """清空数据"""
+        # 清空数据，重新画图
+        self.time_index = []
+        self.listBar = []
+        self.listVol = []
+        self.listLow = []
+        self.listHigh = []
+        self.listOpenInterest = []
+        self.listSig = []
+        self.arrows = []
+        self.datas = None
+
+    #----------------------------------------------------------------------
+    def onBar(self, bar, nWindow = 20):
+        """
+        新增K线数据,K线播放模式
+        nWindow : 最大数据窗口
+        """
+        # 是否需要更新K线
+        newBar = False if len(self.datas)>0 and bar.datetime==self.datas[-1].datetime else True
+        nrecords = len(self.datas) if newBar else len(self.datas)-1
+        bar.openInterest = np.random.randint(0,3) if bar.openInterest==np.inf or bar.openInterest==-np.inf else bar.openInterest
+        recordVol = (nrecords,bar.volume,0,0,bar.volume) if bar.close < bar.open else (nrecords,0,bar.volume,0,bar.volume)
+        if newBar:
+            self.datas.resize(nrecords+1,refcheck=0)
+            self.listBar.resize(nrecords+1,refcheck=0)
+            self.listVol.resize(nrecords+1,refcheck=0)
+        elif any(self.datas):
+            self.listLow.pop()
+            self.listHigh.pop()
+            self.listOpenInterest.pop()
+        if any(self.datas):
+            self.datas[-1]   = (bar.datetime, bar.open, bar.close, bar.low, bar.high, bar.volume, bar.openInterest)
+            self.listBar[-1] = (nrecords, bar.open, bar.close, bar.low, bar.high)
+            self.listVol[-1] = recordVol
+        else:
+            self.datas     = np.rec.array([(datetime, bar.open, bar.close, bar.low, bar.high, bar.volume, bar.openInterest)],\
+                                        names=('datetime','open','close','low','high','volume','openInterest'))
+            self.listBar   = np.rec.array([(nrecords, bar.open, bar.close, bar.low, bar.high)],\
+                                     names=('datetime','open','close','low','high'))
+            self.listVol   = np.rec.array([recordVol],names=('datetime','open','close','low','high'))
+            self.resignData(self.datas)
+        self.axisTime.update_xdict({nrecords:bar.datetime})
+        self.listLow.append(bar.low)
+        self.listHigh.append(bar.high)
+        self.listOpenInterest.append(bar.openInterest)
+        xMax = nrecords+1
+        xMin = max(0,nrecords-nWindow)
+        if not newBar:
+            self.updateAll()
+        self.plotAll(False,xMin,xMax)
+        self.crosshair.signal.emit((None,None))
+
     #----------------------------------------------------------------------
     def loadData(self, datas):
-        """载入pandas.DataFrame数据"""
-        self.datas = datas
-        # 设置中心点时间，更新横坐标映射，更新Y轴自适应函数，更新十字光标映射
+        """
+        载入pandas.DataFrame数据
+        datas : 数据格式，cols : datetime, open, close, low, high
+        """
+        # 设置中心点时间
         self.index = 0
+        # 绑定数据，更新横坐标映射，更新Y轴自适应函数，更新十字光标映射
+        datas['time_int'] = np.array(range(len(datas.index)))
+        self.datas = datas[['open','close','low','high','volume','openInterest']].to_records()
+        self.axisTime.xdict={}
         xdict = dict(enumerate(datas.index.tolist()))
         self.axisTime.update_xdict(xdict)
-        self.resignData(datas)
+        self.resignData(self.datas)
         # 更新画图用到的数据
-        datas['time_int']     = np.array(range(len(datas.index)))
-        self.listBar          = datas[['time_int','open','close','low','high']].values
-        self.listOpen         = datas['open'].values
-        self.listClose        = datas['close'].values
-        self.listHigh         = datas['high'].values
-        self.listLow          = datas['low'].values
-        self.listOpenInterest = datas['openInterest'].values
+        self.listBar          = datas[['time_int','open','close','low','high']].to_records(False)
+        self.listHigh         = list(datas['high'])
+        self.listLow          = list(datas['low'])
+        self.listOpenInterest = list(datas['openInterest'])
         # 成交量颜色和涨跌同步，K线方向由涨跌决定
-        datas0 = pd.DataFrame()
-        datas0['time_int'] = datas['time_int']
-        datas0['v0'] = datas.apply(lambda x:0 if x['close'] >= x['open'] else x['volume'],axis=1)  
-        datas0['v1'] = datas.apply(lambda x:0 if x['close'] <  x['open'] else x['volume'],axis=1) 
-        self.listVol = datas0[['time_int','v0','v1','v0','v1']].values
+        datas0                = pd.DataFrame()
+        datas0['open']        = datas.apply(lambda x:0 if x['close'] >= x['open'] else x['volume'],axis=1)  
+        datas0['close']       = datas.apply(lambda x:0 if x['close'] <  x['open'] else x['volume'],axis=1) 
+        datas0['low']         = datas0['open']
+        datas0['high']        = datas0['close']
+        datas0['time_int']    = np.array(range(len(datas.index)))
+        self.listVol          = datas0[['time_int','open','close','low','high']].to_records(False)
         # 调用画图函数
-        self.plotKline()     # K线图
-        self.plotVol()       # K线副图，成交量
-        self.plotOI()        # K线副图，持仓量
-        self.pwKL.setLimits(xMin=0,xMax=len(self.listBar))
-        self.refresh()
+        self.plotAll(True,0,len(self.datas))
 
 ########################################################################
 # 功能测试

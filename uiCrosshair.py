@@ -1,5 +1,6 @@
 # encoding: UTF-8
 import sys,os
+import PyQt4
 import pyqtgraph as pg
 import datetime as dt          
 import numpy as np
@@ -10,10 +11,11 @@ from pyqtgraph.Point import Point
 ########################################################################
 # 十字光标支持
 ########################################################################
-class Crosshair(object):
+class Crosshair(PyQt4.QtCore.QObject):
     """
     此类给pg.PlotWidget()添加crossHair功能,PlotWidget实例需要初始化时传入
     """
+    signal = QtCore.pyqtSignal(type(tuple([])))
     #----------------------------------------------------------------------
     def __init__(self,parent,master):
         """Constructor"""
@@ -22,6 +24,7 @@ class Crosshair(object):
         super(Crosshair, self).__init__()
 
         self.xAxis = 0
+        self.yAxis = 0
 
         self.datas = None
 
@@ -56,6 +59,15 @@ class Crosshair(object):
         self.views[0].addItem(self.__textInfo, ignoreBounds=True)     
         self.views[1].addItem(self.__textVolume, ignoreBounds=True)     
         self.proxy = pg.SignalProxy(self.__view.scene().sigMouseMoved, rateLimit=60, slot=self.__mouseMoved)        
+        # 跨线程刷新界面支持
+        self.signal.connect(self.update)
+
+    #----------------------------------------------------------------------
+    def update(self,pos):
+        """刷新界面显示"""
+        xAxis,yAxis = pos
+        xAxis,yAxis = (self.xAxis,self.yAxis) if xAxis is None else (xAxis,yAxis)
+        self.moveTo(xAxis,yAxis)
         
     #----------------------------------------------------------------------
     def __mouseMoved(self,evt):
@@ -74,10 +86,12 @@ class Crosshair(object):
 
     #----------------------------------------------------------------------
     def moveTo(self,xAxis,yAxis):
+        xAxis,yAxis = (self.xAxis,self.yAxis) if xAxis is None else (xAxis,yAxis)
         self.rects  = [self.views[i].sceneBoundingRect() for i in range(3)]
         if not xAxis or not yAxis:
             return
         self.xAxis = xAxis
+        self.yAxis = yAxis
         self.vhLinesSetXY(xAxis,yAxis)
         self.plotPrice(yAxis)
         self.plotInfo(xAxis) 
@@ -121,24 +135,27 @@ class Crosshair(object):
         """
         if self.datas is None:
             return
-        # 获取K线数据
-        tickDatetime    = self.datas.iloc[int(xAxis)].name
-        volume          = self.datas.iloc[int(xAxis)]['volume']
-        openInterest    = self.datas.iloc[int(xAxis)]['openInterest']
-        openPrice       = self.datas.iloc[int(xAxis)]['open']
-        closePrice      = self.datas.iloc[int(xAxis)]['close']
-        highPrice       = self.datas.iloc[int(xAxis)]['high']
-        lowPrice        = self.datas.iloc[int(xAxis)]['low']
-        preClosePrice   = self.datas.iloc[int(xAxis)-1]['close']
+        try:
+            # 获取K线数据
+            tickDatetime    = self.datas[int(xAxis)]['datetime']
+            openPrice       = self.datas[int(xAxis)]['open']
+            closePrice      = self.datas[int(xAxis)]['close']
+            lowPrice        = self.datas[int(xAxis)]['low']
+            highPrice       = self.datas[int(xAxis)]['high']
+            volume          = self.datas[int(xAxis)]['volume']
+            openInterest    = self.datas[int(xAxis)]['openInterest']
+            preClosePrice   = self.datas[int(xAxis)-1]['close']
+        except:
+            return
         
         if(isinstance(tickDatetime,dt.datetime)):
             datetimeText = dt.datetime.strftime(tickDatetime,'%Y-%m-%d %H:%M:%S')
             dateText     = dt.datetime.strftime(tickDatetime,'%Y-%m-%d')
             timeText     = dt.datetime.strftime(tickDatetime,'%H:%M:%S')
         else:
-            datetimeText = "not set."
-            dateText     = "not set."
-            timeText     = "not set."
+            datetimeText = ""
+            dateText     = ""
+            timeText     = ""
         
         # 和上一个收盘价比较，决定K线信息的字符颜色
         openText  = "%.3f" % openPrice
