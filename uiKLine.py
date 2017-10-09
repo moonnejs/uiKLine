@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from functools import partial
 from datetime import datetime,timedelta
+from collections import deque
 
 
 # 字符串转换
@@ -307,7 +308,6 @@ class KLineWidget(KeyWraper):
 
         # 缓存数据
         self.datas    = []
-        self.signals  = []
         self.listBar  = []
         self.listVol  = []
         self.listHigh = []
@@ -317,6 +317,9 @@ class KLineWidget(KeyWraper):
         self.arrows   = []
 
         # 所有K线上信号图
+        self.allColor = deque(['blue','green','yellow','white'])
+        self.sigData  = {}
+        self.sigColor = {}
         self.sigPlots = {}
 
         # 初始化完成
@@ -430,19 +433,22 @@ class KLineWidget(KeyWraper):
         if self.initCompleted:
             self.curveOI.setData(self.listOpenInterest[xmin:xmax]+[0], pen='w', name="OpenInterest")
 
-
     #----------------------------------------------------------------------
     def addSig(self,sig):
         """新增信号图"""
         if sig in self.sigPlots:
             self.pwKL.removeItem(self.sigPlots[sig])
         self.sigPlots[sig] = self.pwKL.plot()
+        self.sigColor[sig] = self.allColor[0]
+        self.allColor.append(self.allColor.popleft())
 
     #----------------------------------------------------------------------
     def showSig(self,datas):
         """刷新信号图"""
-        for sig in datas:
-            self.sigPlots[sig].setData(datas[sig] , pen=(255, 255, 255), name=sig)
+        for sig in self.sigPlots:
+            self.sigData[sig] = datas[sig]
+        [self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)\
+         for sig in self.sigPlots]# if sig in datas]
 
     #----------------------------------------------------------------------
     def plotMark(self):
@@ -524,10 +530,10 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def onNxt(self):
         """跳转到下一个开平仓点"""
-        if len(self.signals)>0 and not self.index is None:
-            datalen = len(self.signals)-1
+        if len(self.listSig)>0 and not self.index is None:
+            datalen = len(self.listSig)
             self.index+=1
-            while self.signals[self.index] == 0 and self.index < datalen:
+            while self.index < datalen and self.listSig[self.index] == 0:
                 self.index+=1
             self.refresh()
             x = self.index
@@ -537,9 +543,9 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def onPre(self):
         """跳转到上一个开平仓点"""
-        if  len(self.signals)>0 and not self.index is None:
+        if  len(self.listSig)>0 and not self.index is None:
             self.index-=1
-            while self.signals[self.index] == 0 and self.index > 1:
+            while self.index > 0 and self.listSig[self.index] == 0:
                 self.index-=1
             self.refresh()
             x = self.index
@@ -591,11 +597,6 @@ class KLineWidget(KeyWraper):
             self.crosshair.signal.emit((x,y))
     
     #----------------------------------------------------------------------
-    def onRClick(self,pos):
-        """右键单击回调"""
-        pass
-
-    #----------------------------------------------------------------------
     # 界面回调相关
     #----------------------------------------------------------------------
     def onPaint(self):
@@ -644,8 +645,15 @@ class KLineWidget(KeyWraper):
         self.listHigh = []
         self.listOpenInterest = []
         self.listSig = []
+        self.sigData = {}
         self.arrows = []
         self.datas = None
+
+    #----------------------------------------------------------------------
+    def updateSig(self,sig):
+        """刷新买卖信号"""
+        self.listSig = sig
+        self.plotMark()
 
     #----------------------------------------------------------------------
     def onBar(self, bar, nWindow = 20):
@@ -658,7 +666,7 @@ class KLineWidget(KeyWraper):
         nrecords = len(self.datas) if newBar else len(self.datas)-1
         bar.openInterest = np.random.randint(0,3) if bar.openInterest==np.inf or bar.openInterest==-np.inf else bar.openInterest
         recordVol = (nrecords,bar.volume,0,0,bar.volume) if bar.close < bar.open else (nrecords,0,bar.volume,0,bar.volume)
-        if newBar:
+        if newBar and any(self.datas):
             self.datas.resize(nrecords+1,refcheck=0)
             self.listBar.resize(nrecords+1,refcheck=0)
             self.listVol.resize(nrecords+1,refcheck=0)

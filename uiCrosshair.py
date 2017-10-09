@@ -4,6 +4,7 @@ import PyQt4
 import pyqtgraph as pg
 import datetime as dt          
 import numpy as np
+import traceback
 
 from pyqtgraph.Qt import QtGui, QtCore
 from pyqtgraph.Point import Point
@@ -38,12 +39,14 @@ class Crosshair(PyQt4.QtCore.QObject):
         self.hLines     = [pg.InfiniteLine(angle=0,  movable=False) for i in range(3)]
         
         #mid 在y轴动态跟随最新价显示最新价和最新时间
-        self.__textDate = pg.TextItem('date')
-        self.__textInfo = pg.TextItem('lastBarInfo')   
+        self.__textDate   = pg.TextItem('date')
+        self.__textInfo   = pg.TextItem('lastBarInfo')   
+        self.__textSig    = pg.TextItem('lastSigInfo',anchor=(1,0))   
         self.__textVolume = pg.TextItem('lastBarVolume',anchor=(1,0))   
 
         self.__textDate.setZValue(2)
         self.__textInfo.setZValue(2)
+        self.__textSig.setZValue(2)
         self.__textVolume.setZValue(2)
         self.__textInfo.border = pg.mkPen(color=(230, 255, 0, 255), width=1.2)
         
@@ -55,9 +58,10 @@ class Crosshair(PyQt4.QtCore.QObject):
             self.views[i].addItem(self.hLines[i])
             self.views[i].addItem(self.textPrices[i])
         
-        self.views[2].addItem(self.__textDate, ignoreBounds=True)
         self.views[0].addItem(self.__textInfo, ignoreBounds=True)     
+        self.views[0].addItem(self.__textSig, ignoreBounds=True)     
         self.views[1].addItem(self.__textVolume, ignoreBounds=True)     
+        self.views[2].addItem(self.__textDate, ignoreBounds=True)
         self.proxy = pg.SignalProxy(self.__view.scene().sigMouseMoved, rateLimit=60, slot=self.__mouseMoved)        
         # 跨线程刷新界面支持
         self.signal.connect(self.update)
@@ -145,9 +149,11 @@ class Crosshair(PyQt4.QtCore.QObject):
             volume          = self.datas[int(xAxis)]['volume']
             openInterest    = self.datas[int(xAxis)]['openInterest']
             preClosePrice   = self.datas[int(xAxis)-1]['close']
-        except:
+        except Exception, e:
+            print(u'回测策略出错：%s' %e)
+            print 'traceback.print_exc():'; traceback.print_exc()
             return
-        
+            
         if(isinstance(tickDatetime,dt.datetime)):
             datetimeText = dt.datetime.strftime(tickDatetime,'%Y-%m-%d %H:%M:%S')
             dateText     = dt.datetime.strftime(tickDatetime,'%Y-%m-%d')
@@ -156,6 +162,16 @@ class Crosshair(PyQt4.QtCore.QObject):
             datetimeText = ""
             dateText     = ""
             timeText     = ""
+
+        # 显示所有的主图技术指标
+        html = u'<div style="text-align: right">'
+        for sig in self.master.sigData:
+            val = self.master.sigData[sig][int(xAxis)]
+            col = self.master.sigColor[sig]
+            html+= u'<span style="color: %s;  font-size: 20px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
+        html+=u'</div>' 
+        self.__textSig.setHtml(html)
+
         
         # 和上一个收盘价比较，决定K线信息的字符颜色
         openText  = "%.3f" % openPrice
@@ -183,11 +199,9 @@ class Crosshair(PyQt4.QtCore.QObject):
                                 <span style="color: %s;     font-size: 16px;">%s</span><br>\
                                 <span style="color: white;  font-size: 16px;">成交量</span><br>\
                                 <span style="color: yellow; font-size: 16px;">%.3f</span><br>\
-                                <span style="color: white;  font-size: 16px;">仓差</span><br>\
-                                <span style="color: yellow; font-size: 16px;">%.3f</span><br>\
                             </div>'\
                                 % (dateText,timeText,cOpen,openText,cHigh,highText,\
-                                    cLow,lowText,cClose,closeText,volume,openInterest))             
+                                    cLow,lowText,cClose,closeText,volume))             
         self.__textDate.setHtml(
                             '<div style="text-align: center">\
                                 <span style="color: yellow; font-size: 20px;">%s</span>\
@@ -207,6 +221,14 @@ class Crosshair(PyQt4.QtCore.QObject):
         x = topLeft.x()
         y = topLeft.y()
         self.__textInfo.setPos(x,y)           
+
+        # K线子图，右上角显示
+        rightAxis = self.views[0].getAxis('right')
+        rightAxisWidth = rightAxis.width()
+        topRight = self.views[0].vb.mapSceneToView(QtCore.QPointF(self.rects[0].right()-rightAxisWidth,self.rects[0].top()))
+        x = topRight.x()
+        y = topRight.y()
+        self.__textSig.setPos(x,y)           
         
         # 成交量子图，右上角显示
         rightAxis = self.views[1].getAxis('right')
