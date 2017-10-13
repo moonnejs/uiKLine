@@ -150,8 +150,6 @@ class Crosshair(PyQt4.QtCore.QObject):
             openInterest    = self.datas[int(xAxis)]['openInterest']
             preClosePrice   = self.datas[int(xAxis)-1]['close']
         except Exception, e:
-            print(u'回测策略出错：%s' %e)
-            print 'traceback.print_exc():'; traceback.print_exc()
             return
             
         if(isinstance(tickDatetime,dt.datetime)):
