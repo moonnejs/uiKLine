@@ -646,7 +646,6 @@ class KLineWidget(KeyWraper):
         self.listOpenInterest = []
         self.listSig = []
         self.sigData = {}
-        self.arrows = []
         self.datas = None
 
     #----------------------------------------------------------------------
@@ -700,7 +699,7 @@ class KLineWidget(KeyWraper):
     def loadData(self, datas):
         """
         载入pandas.DataFrame数据
-        datas : 数据格式，cols : datetime, open, close, low, high
+        datas : 数据格式，cols : datetime, open, close, low, high, volume, openInterest
         """
         # 设置中心点时间
         self.index = 0
