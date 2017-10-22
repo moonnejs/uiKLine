@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Python K线模块,包含十字光标和鼠标键盘交互
+Support By 量投科技(http://www.quantdo.com.cn/)
+"""
 
 
 # Qt相关和十字光标
@@ -75,7 +79,7 @@ class KeyWraper(QtGui.QWidget):
         else:
             self.onDown()
 
-    #重载方法dragMoveEvent(self,event),即拖动事件方法
+    #重载方法paintEvent(self,event),即拖动事件方法
     #----------------------------------------------------------------------
     def paintEvent(self, event):
         self.onPaint()
@@ -240,9 +244,9 @@ class CandlestickItem(pg.GraphicsObject):
         low,high = (data[0]['low'],data[0]['high']) if len(data)>0 else (0,1)
         for (t, open0, close0, low0, high0) in data:
             if t >= len(self.pictures):
-                low,high = (min(low,low0),max(high,high0))
                 picture = QtGui.QPicture()
                 p = QtGui.QPainter(picture)
+                low,high = (min(low,low0),max(high,high0))
                 # 下跌蓝色（实心）, 上涨红色（空心）
                 pen,brush,pmin,pmax = (bPen,bBrush,close0,open0)\
                     if open0 > close0 else (rPen,rBrush,open0,close0)
@@ -269,10 +273,10 @@ class CandlestickItem(pg.GraphicsObject):
 
     # 自动重画
     #----------------------------------------------------------------------
-    def paint(self, p, o, w):
-        rect = o.exposedRect
-        xmin,xmax = (max(0,int(rect.left())),min(len(self.pictures),int(rect.right())))
-        [p.drawPicture(0, 0, pic) for pic in self.pictures[xmin:xmax]]
+    def paint(self, painter, opt, w):
+        rect = opt.exposedRect
+        xmin,xmax = (max(0,int(rect.left())),min(int(len(self.pictures)),int(rect.right())))
+        [pic.play(painter) for pic in self.pictures[xmin:xmax]]
 
     # 定义边界
     #----------------------------------------------------------------------
@@ -321,6 +325,12 @@ class KLineWidget(KeyWraper):
         self.sigData  = {}
         self.sigColor = {}
         self.sigPlots = {}
+
+        # 所副图上信号图
+        self.allSubColor = deque(['blue','green','yellow','white'])
+        self.subSigData  = {}
+        self.subSigColor = {}
+        self.subSigPlots = {}
 
         # 初始化完成
         self.initCompleted = False
@@ -434,21 +444,34 @@ class KLineWidget(KeyWraper):
             self.curveOI.setData(self.listOpenInterest[xmin:xmax]+[0], pen='w', name="OpenInterest")
 
     #----------------------------------------------------------------------
-    def addSig(self,sig):
+    def addSig(self,sig,main=True):
         """新增信号图"""
-        if sig in self.sigPlots:
-            self.pwKL.removeItem(self.sigPlots[sig])
-        self.sigPlots[sig] = self.pwKL.plot()
-        self.sigColor[sig] = self.allColor[0]
-        self.allColor.append(self.allColor.popleft())
+        if main:
+            if sig in self.sigPlots:
+                self.pwKL.removeItem(self.sigPlots[sig])
+            self.sigPlots[sig] = self.pwKL.plot()
+            self.sigColor[sig] = self.allColor[0]
+            self.allColor.append(self.allColor.popleft())
+        else:
+            if sig in self.subSigPlots:
+                self.pwOI.removeItem(self.subSigPlots[sig])
+            self.subSigPlots[sig] = self.pwOI.plot()
+            self.subSigColor[sig] = self.allSubColor[0]
+            self.allSubColor.append(self.allSubColor.popleft())
 
     #----------------------------------------------------------------------
-    def showSig(self,datas):
+    def showSig(self,datas,main=True):
         """刷新信号图"""
-        for sig in self.sigPlots:
-            self.sigData[sig] = datas[sig]
-        [self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)\
-         for sig in self.sigPlots]# if sig in datas]
+        if main:
+            for sig in self.sigPlots:
+                self.sigData[sig] = datas[sig]
+            [self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)\
+             for sig in self.sigPlots]# if sig in datas]
+        else:
+            for sig in self.subSigPlots:
+                self.subSigData[sig] = datas[sig]
+            [self.subSigPlots[sig].setData(datas[sig], pen=self.subSigColor[sig][0], name=sig)\
+             for sig in self.subSigPlots]# if sig in datas]
 
     #----------------------------------------------------------------------
     def plotMark(self):
@@ -699,7 +722,7 @@ class KLineWidget(KeyWraper):
     def loadData(self, datas):
         """
         载入pandas.DataFrame数据
-        datas : 数据格式，cols : datetime, open, close, low, high, volume, openInterest
+        datas : 数据格式，cols : datetime, open, close, low, high
         """
         # 设置中心点时间
         self.index = 0

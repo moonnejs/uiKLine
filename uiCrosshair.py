@@ -42,11 +42,13 @@ class Crosshair(PyQt4.QtCore.QObject):
         self.__textDate   = pg.TextItem('date')
         self.__textInfo   = pg.TextItem('lastBarInfo')   
         self.__textSig    = pg.TextItem('lastSigInfo',anchor=(1,0))   
+        self.__textSubSig = pg.TextItem('lastSubSigInfo',anchor=(1,0))   
         self.__textVolume = pg.TextItem('lastBarVolume',anchor=(1,0))   
 
         self.__textDate.setZValue(2)
         self.__textInfo.setZValue(2)
         self.__textSig.setZValue(2)
+        self.__textSubSig.setZValue(2)
         self.__textVolume.setZValue(2)
         self.__textInfo.border = pg.mkPen(color=(230, 255, 0, 255), width=1.2)
         
@@ -62,7 +64,8 @@ class Crosshair(PyQt4.QtCore.QObject):
         self.views[0].addItem(self.__textSig, ignoreBounds=True)     
         self.views[1].addItem(self.__textVolume, ignoreBounds=True)     
         self.views[2].addItem(self.__textDate, ignoreBounds=True)
-        self.proxy = pg.SignalProxy(self.__view.scene().sigMouseMoved, rateLimit=60, slot=self.__mouseMoved)        
+        self.views[2].addItem(self.__textSubSig, ignoreBounds=True)     
+        self.proxy = pg.SignalProxy(self.__view.scene().sigMouseMoved, rateLimit=360, slot=self.__mouseMoved)        
         # 跨线程刷新界面支持
         self.signal.connect(self.update)
 
@@ -170,6 +173,15 @@ class Crosshair(PyQt4.QtCore.QObject):
         html+=u'</div>' 
         self.__textSig.setHtml(html)
 
+        # 显示所有的主图技术指标
+        html = u'<div style="text-align: right">'
+        for sig in self.master.subSigData:
+            val = self.master.subSigData[sig][int(xAxis)]
+            col = self.master.subSigColor[sig]
+            html+= u'<span style="color: %s;  font-size: 20px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
+        html+=u'</div>' 
+        self.__textSubSig.setHtml(html)
+
         
         # 和上一个收盘价比较，决定K线信息的字符颜色
         openText  = "%.3f" % openPrice
@@ -227,6 +239,14 @@ class Crosshair(PyQt4.QtCore.QObject):
         x = topRight.x()
         y = topRight.y()
         self.__textSig.setPos(x,y)           
+        
+        # K线子图，右上角显示
+        rightAxis = self.views[2].getAxis('right')
+        rightAxisWidth = rightAxis.width()
+        topRight = self.views[2].vb.mapSceneToView(QtCore.QPointF(self.rects[2].right()-rightAxisWidth,self.rects[2].top()))
+        x = topRight.x()
+        y = topRight.y()
+        self.__textSubSig.setPos(x,y)           
         
         # 成交量子图，右上角显示
         rightAxis = self.views[1].getAxis('right')
