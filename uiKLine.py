@@ -210,6 +210,8 @@ class CandlestickItem(pg.GraphicsObject):
         # 数据格式: [ (time, open, close, low, high),...]
         self.data = data
         # 只重画部分图形，大大提高界面更新速度
+        self.rect = None
+        self.picture = None
         self.setFlag(self.ItemUsesExtendedStyleOption)
         # 画笔和画刷
         w = 0.4
@@ -218,6 +220,7 @@ class CandlestickItem(pg.GraphicsObject):
         self.high     = 1
         self.picture  = QtGui.QPicture()
         self.pictures = []
+        self.ranges   = []
         self.bPen     = pg.mkPen(color=(0, 240, 240, 255), width=w*2)
         self.bBrush   = pg.mkBrush((0, 240, 240, 255))
         self.rPen     = pg.mkPen(color=(255, 60, 60, 255), width=w*2)
@@ -234,8 +237,9 @@ class CandlestickItem(pg.GraphicsObject):
         # 重画或者只更新最后一个K线
         if redraw:
             self.pictures = []
+            self.ranges = []
         elif self.pictures:
-            self.pictures.pop()
+            self.ranges.pop()
         w = 0.4
         bPen   = self.bPen
         bBrush = self.bBrush
@@ -263,6 +267,7 @@ class CandlestickItem(pg.GraphicsObject):
                     p.drawLine(QtCore.QPointF(t,pmax), QtCore.QPointF(t, high0))
                 p.end()
                 self.pictures.append(picture)
+                self.ranges.append((low0,high0))
         self.low,self.high = low,high
 
     # 手动重画
@@ -276,7 +281,22 @@ class CandlestickItem(pg.GraphicsObject):
     def paint(self, painter, opt, w):
         rect = opt.exposedRect
         xmin,xmax = (max(0,int(rect.left())),min(int(len(self.pictures)),int(rect.right())))
-        [pic.play(painter) for pic in self.pictures[xmin:xmax]]
+        if not self.rect == (rect.left(),rect.right()) or self.picture is None:
+            self.rect = (rect.left(),rect.right())
+            self.picture = self.createPic(xmin,xmax)
+            self.picture.play(painter)
+        elif self.picture:
+            self.picture.play(painter)
+
+
+    # 缓存图片
+    #----------------------------------------------------------------------
+    def createPic(self,xmin,xmax):
+        picture = QtGui.QPicture()
+        p = QtGui.QPainter(picture)
+        [pic.play(p) for pic in self.pictures[xmin:xmax]]
+        p.end()
+        return picture
 
     # 定义边界
     #----------------------------------------------------------------------
@@ -742,8 +762,8 @@ class KLineWidget(KeyWraper):
         datas0                = pd.DataFrame()
         datas0['open']        = datas.apply(lambda x:0 if x['close'] >= x['open'] else x['volume'],axis=1)  
         datas0['close']       = datas.apply(lambda x:0 if x['close'] <  x['open'] else x['volume'],axis=1) 
-        datas0['low']         = datas0['open']
-        datas0['high']        = datas0['close']
+        datas0['low']         = 0
+        datas0['high']        = datas['volume']
         datas0['time_int']    = np.array(range(len(datas.index)))
         self.listVol          = datas0[['time_int','open','close','low','high']].to_records(False)
         # 调用画图函数
