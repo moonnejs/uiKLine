@@ -220,7 +220,6 @@ class CandlestickItem(pg.GraphicsObject):
         self.high     = 1
         self.picture  = QtGui.QPicture()
         self.pictures = []
-        self.ranges   = []
         self.bPen     = pg.mkPen(color=(0, 240, 240, 255), width=w*2)
         self.bBrush   = pg.mkBrush((0, 240, 240, 255))
         self.rPen     = pg.mkPen(color=(255, 60, 60, 255), width=w*2)
@@ -237,9 +236,8 @@ class CandlestickItem(pg.GraphicsObject):
         # 重画或者只更新最后一个K线
         if redraw:
             self.pictures = []
-            self.ranges = []
         elif self.pictures:
-            self.ranges.pop()
+            self.pictures.pop()
         w = 0.4
         bPen   = self.bPen
         bBrush = self.bBrush
@@ -267,7 +265,6 @@ class CandlestickItem(pg.GraphicsObject):
                     p.drawLine(QtCore.QPointF(t,pmax), QtCore.QPointF(t, high0))
                 p.end()
                 self.pictures.append(picture)
-                self.ranges.append((low0,high0))
         self.low,self.high = low,high
 
     # 手动重画

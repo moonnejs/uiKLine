@@ -105,7 +105,6 @@ class Crosshair(PyQt4.QtCore.QObject):
         self.yAxis = yAxis
         self.vhLinesSetXY(xAxis,yAxis)
         self.signalInfo.emit(xAxis,yAxis)
-        #self.plotInfo(xAxis,yAxis) 
 
     #----------------------------------------------------------------------
     def vhLinesSetXY(self,xAxis,yAxis):
