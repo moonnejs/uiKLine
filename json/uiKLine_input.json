@@ -1,0 +1,48 @@
+[
+    {
+	"name": "signalName",
+        "default": "", 
+        "class": "信号输入",
+        "label": "信号选择", 
+	"width": 4,
+	"type": "List",
+	"eval": false,
+	"ListVar" : "[]"
+    },
+    {
+	"name": "wLimit",
+        "default": "10", 
+        "class": "回测参数",
+        "label": "止盈/开始", 
+	"width": 2,
+	"eval": true,
+	"type": "Edit"
+    },
+    {
+	"name": "cLimit",
+        "default": "4", 
+        "class": "回测参数",
+        "label": "止损/间隔", 
+	"width": 2,
+	"eval": true,
+	"type": "Edit"
+    },
+    {
+	"name": "size",
+        "default": "4", 
+        "class": "回测参数",
+        "label": "下单手数", 
+	"width": 2,
+	"eval": true,
+	"type": "Edit"
+    },
+    {
+	"name": "sLippage",
+        "default": "1", 
+        "class": "回测参数",
+        "label": "合约滑点", 
+	"width": 2,
+	"eval": true,
+	"type": "Edit"
+    }
+]

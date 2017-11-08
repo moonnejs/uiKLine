@@ -1,0 +1,51 @@
+[
+    {
+        "class": "输入控制",
+        "label": "载入数据", 
+	"width": 2,
+	"func": "klLoad",
+	"style":"blueButton"
+    },
+    {
+        "class": "回测控制",
+        "label": "信号回测", 
+	"width": 2,
+	"func": "klBacktest",
+	"style":"greenButton"
+    },
+    {
+        "class": "回测控制",
+        "label": "盈损热力", 
+	"width": 2,
+	"func": "klHeatmap",
+	"style":"greenButton"
+    },
+    {
+        "class": "信号控制",
+        "label": "只看开仓", 
+	"width": 2,
+	"func": "klSigmode",
+	"style":"redButton"
+    },
+    {
+        "class": "信号控制",
+        "label": "主图显示", 
+	"width": 2,
+	"func": "klShowmain",
+	"style":"redButton"
+    },
+    {
+        "class": "信号控制",
+        "label": "副图显示", 
+	"width": 2,
+	"func": "klShowdown",
+	"style":"redButton"
+    },
+    {
+        "class": "信号控制",
+        "label": "清空信号", 
+	"width": 2,
+	"func": "klClearSig",
+	"style":"redButton"
+    }
+]
