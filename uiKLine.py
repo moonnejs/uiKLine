@@ -36,6 +36,7 @@ class KeyWraper(QtGui.QWidget):
     #----------------------------------------------------------------------
     def __init__(self, parent=None):
         QtGui.QWidget.__init__(self, parent)
+        self.setMouseTracking(True)
 
     #重载方法keyPressEvent(self,event),即按键按下事件方法
     #----------------------------------------------------------------------
@@ -282,7 +283,7 @@ class CandlestickItem(pg.GraphicsObject):
             self.rect = (rect.left(),rect.right())
             self.picture = self.createPic(xmin,xmax)
             self.picture.play(painter)
-        elif self.picture:
+        elif not self.picture is None:
             self.picture.play(painter)
 
 
@@ -477,18 +478,25 @@ class KLineWidget(KeyWraper):
             self.allSubColor.append(self.allSubColor.popleft())
 
     #----------------------------------------------------------------------
-    def showSig(self,datas,main=True):
+    def showSig(self,datas,main=True,clear=False):
         """刷新信号图"""
+        if clear:
+            self.clearSig(main)
+            if datas and not main:
+                sigDatas = np.array(datas.values()[0])
+                self.listOpenInterest = sigDatas
+                self.datas['openInterest'] = sigDatas
+                self.plotOI(0,len(sigDatas))
         if main:
-            for sig in self.sigPlots:
+            for sig in datas:
+                self.addSig(sig,main)
                 self.sigData[sig] = datas[sig]
-            [self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)\
-             for sig in self.sigPlots]# if sig in datas]
+                self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)
         else:
-            for sig in self.subSigPlots:
+            for sig in datas:
+                self.addSig(sig,main)
                 self.subSigData[sig] = datas[sig]
-            [self.subSigPlots[sig].setData(datas[sig], pen=self.subSigColor[sig][0], name=sig)\
-             for sig in self.subSigPlots]# if sig in datas]
+                self.subSigPlots[sig].setData(datas[sig], pen=self.subSigColor[sig][0], name=sig)
 
     #----------------------------------------------------------------------
     def plotMark(self):
@@ -689,6 +697,21 @@ class KLineWidget(KeyWraper):
         self.datas = None
 
     #----------------------------------------------------------------------
+    def clearSig(self,main=True):
+        """清空信号图形"""
+        # 清空信号图
+        if main:
+            for sig in self.sigPlots:
+                self.pwKL.removeItem(self.sigPlots[sig])
+            self.sigData  = {}
+            self.sigPlots = {}
+        else:
+            for sig in self.subSigPlots:
+                self.pwOI.removeItem(self.subSigPlots[sig])
+            self.subSigData  = {}
+            self.subSigPlots = {}
+
+    #----------------------------------------------------------------------
     def updateSig(self,sig):
         """刷新买卖信号"""
         self.listSig = sig
@@ -744,7 +767,8 @@ class KLineWidget(KeyWraper):
         # 设置中心点时间
         self.index = 0
         # 绑定数据，更新横坐标映射，更新Y轴自适应函数，更新十字光标映射
-        datas['time_int'] = np.array(range(len(datas.index)))
+        datas.insert(1,'time_int',np.array(range(len(datas.index))))
+        #datas['time_int'] = np.array(range(len(datas.index)))
         self.datas = datas[['open','close','low','high','volume','openInterest']].to_records()
         self.axisTime.xdict={}
         xdict = dict(enumerate(datas.index.tolist()))
