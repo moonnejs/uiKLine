@@ -41,57 +41,48 @@ class KeyWraper(QtGui.QWidget):
     #重载方法keyPressEvent(self,event),即按键按下事件方法
     #----------------------------------------------------------------------
     def keyPressEvent(self, event):
-        if self.hasFocus():
-            if event.key() == QtCore.Qt.Key_Up:
-                self.onUp()
-            elif event.key() == QtCore.Qt.Key_Down:
-                self.onDown()
-            elif event.key() == QtCore.Qt.Key_Left:
-                self.onLeft()
-            elif event.key() == QtCore.Qt.Key_Right:
-                self.onRight()
-            elif event.key() == QtCore.Qt.Key_PageUp:
-                self.onPre()
-            elif event.key() == QtCore.Qt.Key_PageDown:
-                self.onNxt()
-            event.accept()
+        if event.key() == QtCore.Qt.Key_Up:
+            self.onUp()
+        elif event.key() == QtCore.Qt.Key_Down:
+            self.onDown()
+        elif event.key() == QtCore.Qt.Key_Left:
+            self.onLeft()
+        elif event.key() == QtCore.Qt.Key_Right:
+            self.onRight()
+        elif event.key() == QtCore.Qt.Key_PageUp:
+            self.onPre()
+        elif event.key() == QtCore.Qt.Key_PageDown:
+            self.onNxt()
 
     #重载方法mousePressEvent(self,event),即鼠标点击事件方法
     #----------------------------------------------------------------------
     def mousePressEvent(self, event):
-        if self.hasFocus():
-            if event.button() == QtCore.Qt.RightButton:
-                self.onRClick(event.pos())
-            elif event.button() == QtCore.Qt.LeftButton:
-                self.onLClick(event.pos())
-            event.accept()
+        if event.button() == QtCore.Qt.RightButton:
+            self.onRClick(event.pos())
+        elif event.button() == QtCore.Qt.LeftButton:
+            self.onLClick(event.pos())
 
     #重载方法mouseReleaseEvent(self,event),即鼠标点击事件方法
     #----------------------------------------------------------------------
     def mouseRelease(self, event):
-        if self.hasFocus():
-            if event.button() == QtCore.Qt.RightButton:
-                self.onRRelease(event.pos())
-            elif event.button() == QtCore.Qt.LeftButton:
-                self.onLRelease(event.pos())
-            self.releaseMouse()
+        if event.button() == QtCore.Qt.RightButton:
+            self.onRRelease(event.pos())
+        elif event.button() == QtCore.Qt.LeftButton:
+            self.onLRelease(event.pos())
+        self.releaseMouse()
 
     #重载方法wheelEvent(self,event),即滚轮事件方法
     #----------------------------------------------------------------------
     def wheelEvent(self, event):
-        if self.hasFocus():
-            if event.delta() > 0:
-                self.onUp()
-            else:
-                self.onDown()
-            event.accept()
+        if event.delta() > 0:
+            self.onUp()
+        else:
+            self.onDown()
 
     #重载方法paintEvent(self,event),即拖动事件方法
     #----------------------------------------------------------------------
     def paintEvent(self, event):
-        if self.hasFocus():
-            self.onPaint()
-            event.accept()
+        self.onPaint()
 
     # PgDown键
     #----------------------------------------------------------------------
@@ -338,8 +329,8 @@ class KLineWidget(KeyWraper):
         self.index    = None    # 下标
         self.countK   = 60      # 显示的Ｋ线范围
 
-        #KLineWidget.clsId += 1
-        self.windowId = 'aa'#str(KLineWidget.clsId)
+        KLineWidget.clsId += 1
+        self.windowId = str(KLineWidget.clsId)
 
         # 缓存数据
         self.datas    = []
