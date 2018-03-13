@@ -105,6 +105,7 @@ class Crosshair(PyQt4.QtCore.QObject):
         self.yAxis = yAxis
         self.vhLinesSetXY(xAxis,yAxis)
         self.plotInfo(xAxis,yAxis)
+        self.master.volume.update()
 
     #----------------------------------------------------------------------
     def vhLinesSetXY(self,xAxis,yAxis):
@@ -133,9 +134,10 @@ class Crosshair(PyQt4.QtCore.QObject):
             closePrice      = data['close']
             lowPrice        = data['low']
             highPrice       = data['high']
-            volume          = data['volume']
-            openInterest    = data['openInterest']
+            volume          = int(data['volume'])
+            openInterest    = int(data['openInterest'])
             preClosePrice   = lastdata['close']
+            tradePrice      = abs(self.master.listSig[xAxis])
         except Exception, e:
             return
             
@@ -153,7 +155,7 @@ class Crosshair(PyQt4.QtCore.QObject):
         for sig in self.master.sigData:
             val = self.master.sigData[sig][xAxis]
             col = self.master.sigColor[sig]
-            html+= u'<span style="color: %s;  font-size: 20px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
+            html+= u'<span style="color: %s;  font-size: 18px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
         html+=u'</div>' 
         self.__textSig.setHtml(html)
 
@@ -162,7 +164,7 @@ class Crosshair(PyQt4.QtCore.QObject):
         for sig in self.master.subSigData:
             val = self.master.subSigData[sig][xAxis]
             col = self.master.subSigColor[sig]
-            html+= u'<span style="color: %s;  font-size: 20px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
+            html+= u'<span style="color: %s;  font-size: 18px;">&nbsp;&nbsp;%s：%.2f</span>' %(col,sig,val)
         html+=u'</div>' 
         self.__textSubSig.setHtml(html)
 
@@ -179,28 +181,27 @@ class Crosshair(PyQt4.QtCore.QObject):
                                 <span style="color: yellow; font-size: 16px;">%s</span><br>\
                                 <span style="color: white;  font-size: 16px;">时间</span><br>\
                                 <span style="color: yellow; font-size: 16px;">%s</span><br>\
-                                <span style="color: white;  font-size: 16px;">开盘</span><br>\
-                                <span style="color: %s;     font-size: 16px;">%.3f</span><br>\
-                                <span style="color: white;  font-size: 16px;">最高</span><br>\
-                                <span style="color: %s;     font-size: 16px;">%.3f</span><br>\
-                                <span style="color: white;  font-size: 16px;">最低</span><br>\
-                                <span style="color: %s;     font-size: 16px;">%.3f</span><br>\
-                                <span style="color: white;  font-size: 16px;">收盘</span><br>\
-                                <span style="color: %s;     font-size: 16px;">%.3f</span><br>\
+                                <span style="color: white;  font-size: 16px;">价格</span><br>\
+                                <span style="color: %s;     font-size: 16px;">(开) %.3f</span><br>\
+                                <span style="color: %s;     font-size: 16px;">(高) %.3f</span><br>\
+                                <span style="color: %s;     font-size: 16px;">(低) %.3f</span><br>\
+                                <span style="color: %s;     font-size: 16px;">(收) %.3f</span><br>\
                                 <span style="color: white;  font-size: 16px;">成交量</span><br>\
-                                <span style="color: yellow; font-size: 16px;">%.3f</span><br>\
+                                <span style="color: yellow; font-size: 16px;">(量) %d</span><br>\
+                                <span style="color: white;  font-size: 16px;">成交价</span><br>\
+                                <span style="color: yellow; font-size: 16px;">(价) %.3f</span><br>\
                             </div>'\
                                 % (dateText,timeText,cOpen,openPrice,cHigh,highPrice,\
-                                    cLow,lowPrice,cClose,closePrice,volume))             
+                                    cLow,lowPrice,cClose,closePrice,volume,tradePrice))             
         self.__textDate.setHtml(
                             '<div style="text-align: center">\
-                                <span style="color: yellow; font-size: 20px;">%s</span>\
+                                <span style="color: yellow; font-size: 18px;">%s</span>\
                             </div>'\
                                 % (datetimeText))   
 
         self.__textVolume.setHtml(
                             '<div style="text-align: right">\
-                                <span style="color: white; font-size: 20px;">VOL : %.3f</span>\
+                                <span style="color: white; font-size: 18px;">VOL : %.3f</span>\
                             </div>'\
                                 % (volume))   
         # 坐标轴宽度
@@ -217,7 +218,7 @@ class Crosshair(PyQt4.QtCore.QObject):
             if self.showHLine[i]:
                 self.textPrices[i].setHtml(
                         '<div style="text-align: right">\
-                             <span style="color: yellow; font-size: 20px;">\
+                             <span style="color: yellow; font-size: 18px;">\
                                %0.3f\
                              </span>\
                          </div>'\

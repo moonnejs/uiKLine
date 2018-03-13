@@ -41,49 +41,57 @@ class KeyWraper(QtGui.QWidget):
     #重载方法keyPressEvent(self,event),即按键按下事件方法
     #----------------------------------------------------------------------
     def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Up:
-            self.onUp()
-        elif event.key() == QtCore.Qt.Key_Down:
-            self.onDown()
-        elif event.key() == QtCore.Qt.Key_Left:
-            self.onLeft()
-        elif event.key() == QtCore.Qt.Key_Right:
-            self.onRight()
-        elif event.key() == QtCore.Qt.Key_PageUp:
-            self.onPre()
-        elif event.key() == QtCore.Qt.Key_PageDown:
-            self.onNxt()
+        if self.hasFocus():
+            if event.key() == QtCore.Qt.Key_Up:
+                self.onUp()
+            elif event.key() == QtCore.Qt.Key_Down:
+                self.onDown()
+            elif event.key() == QtCore.Qt.Key_Left:
+                self.onLeft()
+            elif event.key() == QtCore.Qt.Key_Right:
+                self.onRight()
+            elif event.key() == QtCore.Qt.Key_PageUp:
+                self.onPre()
+            elif event.key() == QtCore.Qt.Key_PageDown:
+                self.onNxt()
+            event.accept()
 
     #重载方法mousePressEvent(self,event),即鼠标点击事件方法
     #----------------------------------------------------------------------
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.RightButton:
-            self.onRClick(event.pos())
-        elif event.button() == QtCore.Qt.LeftButton:
-            self.onLClick(event.pos())
-        event.accept()
+        if self.hasFocus():
+            if event.button() == QtCore.Qt.RightButton:
+                self.onRClick(event.pos())
+            elif event.button() == QtCore.Qt.LeftButton:
+                self.onLClick(event.pos())
+            event.accept()
 
     #重载方法mouseReleaseEvent(self,event),即鼠标点击事件方法
     #----------------------------------------------------------------------
     def mouseRelease(self, event):
-        if event.button() == QtCore.Qt.RightButton:
-            self.onRRelease(event.pos())
-        elif event.button() == QtCore.Qt.LeftButton:
-            self.onLRelease(event.pos())
-        self.releaseMouse()
+        if self.hasFocus():
+            if event.button() == QtCore.Qt.RightButton:
+                self.onRRelease(event.pos())
+            elif event.button() == QtCore.Qt.LeftButton:
+                self.onLRelease(event.pos())
+            self.releaseMouse()
 
     #重载方法wheelEvent(self,event),即滚轮事件方法
     #----------------------------------------------------------------------
     def wheelEvent(self, event):
-        if event.delta() > 0:
-            self.onUp()
-        else:
-            self.onDown()
+        if self.hasFocus():
+            if event.delta() > 0:
+                self.onUp()
+            else:
+                self.onDown()
+            event.accept()
 
     #重载方法paintEvent(self,event),即拖动事件方法
     #----------------------------------------------------------------------
     def paintEvent(self, event):
-        self.onPaint()
+        if self.hasFocus():
+            self.onPaint()
+            event.accept()
 
     # PgDown键
     #----------------------------------------------------------------------
@@ -286,7 +294,6 @@ class CandlestickItem(pg.GraphicsObject):
         elif not self.picture is None:
             self.picture.play(painter)
 
-
     # 缓存图片
     #----------------------------------------------------------------------
     def createPic(self,xmin,xmax):
@@ -305,6 +312,9 @@ class CandlestickItem(pg.GraphicsObject):
 ########################################################################
 class KLineWidget(KeyWraper):
     """用于显示价格走势图"""
+
+    # 窗口标识
+    clsId = 0
 
     # 保存K线数据的列表和Numpy Array对象
     listBar  = []
@@ -327,6 +337,9 @@ class KLineWidget(KeyWraper):
         # 当前序号
         self.index    = None    # 下标
         self.countK   = 60      # 显示的Ｋ线范围
+
+        #KLineWidget.clsId += 1
+        self.windowId = 'aa'#str(KLineWidget.clsId)
 
         # 缓存数据
         self.datas    = []
@@ -409,11 +422,11 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def initplotVol(self):
         """初始化成交量子图"""
-        self.pwVol  = self.makePI('PlotVol')
+        self.pwVol  = self.makePI('_'.join([self.windowId,'PlotVOL']))
         self.volume = CandlestickItem(self.listVol)
         self.pwVol.addItem(self.volume)
         self.pwVol.setMaximumHeight(150)
-        self.pwVol.setXLink('PlotOI')
+        self.pwVol.setXLink('_'.join([self.windowId,'PlotOI']))
         self.pwVol.hideAxis('bottom')
 
         self.lay_KL.nextRow()
@@ -422,10 +435,11 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def initplotKline(self):
         """初始化K线子图"""
-        self.pwKL = self.makePI('PlotKL')
+        self.pwKL = self.makePI('_'.join([self.windowId,'PlotKL']))
         self.candle = CandlestickItem(self.listBar)
         self.pwKL.addItem(self.candle)
-        self.pwKL.setXLink('PlotOI')
+        self.pwKL.setMinimumHeight(350)
+        self.pwKL.setXLink('_'.join([self.windowId,'PlotOI']))
         self.pwKL.hideAxis('bottom')
 
         self.lay_KL.nextRow()
@@ -434,7 +448,7 @@ class KLineWidget(KeyWraper):
     #----------------------------------------------------------------------
     def initplotOI(self):
         """初始化持仓量子图"""
-        self.pwOI = self.makePI('PlotOI')
+        self.pwOI = self.makePI('_'.join([self.windowId,'PlotOI']))
         self.curveOI = self.pwOI.plot()
 
         self.lay_KL.nextRow()
@@ -453,13 +467,13 @@ class KLineWidget(KeyWraper):
         """重画K线子图"""
         if self.initCompleted:
             self.candle.generatePicture(self.listBar[xmin:xmax],redraw)   # 画K线
-            self.plotMark()                             # 显示开平仓信号位置
+            self.plotMark()                                               # 显示开平仓信号位置
 
     #----------------------------------------------------------------------
     def plotOI(self,xmin=0,xmax=-1):
         """重画持仓量子图"""
         if self.initCompleted:
-            self.curveOI.setData(self.listOpenInterest[xmin:xmax]+[0], pen='w', name="OpenInterest")
+            self.curveOI.setData(self.listOpenInterest[xmin:xmax], pen='w', name="OpenInterest")
 
     #----------------------------------------------------------------------
     def addSig(self,sig,main=True):
@@ -526,6 +540,8 @@ class KLineWidget(KeyWraper):
         手动更新所有K线图形，K线播放模式下需要
         """
         datas = self.datas
+        self.volume.pictrue = None
+        self.candle.pictrue = None
         self.volume.update()
         self.candle.update()
         def update(view,low,high):
@@ -718,7 +734,7 @@ class KLineWidget(KeyWraper):
         self.plotMark()
 
     #----------------------------------------------------------------------
-    def onBar(self, bar, nWindow = 20):
+    def onBar(self, bar, sig = 0, nWindow = 20):
         """
         新增K线数据,K线播放模式
         nWindow : 最大数据窗口
@@ -728,11 +744,13 @@ class KLineWidget(KeyWraper):
         nrecords = len(self.datas) if newBar else len(self.datas)-1
         bar.openInterest = np.random.randint(0,3) if bar.openInterest==np.inf or bar.openInterest==-np.inf else bar.openInterest
         recordVol = (nrecords,bar.volume,0,0,bar.volume) if bar.close < bar.open else (nrecords,0,bar.volume,0,bar.volume)
+
         if newBar and any(self.datas):
             self.datas.resize(nrecords+1,refcheck=0)
             self.listBar.resize(nrecords+1,refcheck=0)
             self.listVol.resize(nrecords+1,refcheck=0)
         elif any(self.datas):
+            self.listSig.pop()
             self.listLow.pop()
             self.listHigh.pop()
             self.listOpenInterest.pop()
@@ -744,22 +762,27 @@ class KLineWidget(KeyWraper):
             self.datas     = np.rec.array([(datetime, bar.open, bar.close, bar.low, bar.high, bar.volume, bar.openInterest)],\
                                         names=('datetime','open','close','low','high','volume','openInterest'))
             self.listBar   = np.rec.array([(nrecords, bar.open, bar.close, bar.low, bar.high)],\
-                                     names=('datetime','open','close','low','high'))
-            self.listVol   = np.rec.array([recordVol],names=('datetime','open','close','low','high'))
+                                     names=('time_int','open','close','low','high'))
+            self.listVol   = np.rec.array([recordVol],names=('time_int','open','close','low','high'))
             self.resignData(self.datas)
+
         self.axisTime.update_xdict({nrecords:bar.datetime})
+        self.listSig.append(sig)
         self.listLow.append(bar.low)
         self.listHigh.append(bar.high)
         self.listOpenInterest.append(bar.openInterest)
-        xMax = nrecords+1
-        xMin = max(0,nrecords-nWindow)
+        self.resignData(self.datas)
+        nWindow0 = min(nrecords,nWindow)
+        xMax = nrecords+2
+        xMin = max(0,nrecords-nWindow0)
+        self.plotAll(False,xMin,xMax)
         if not newBar:
             self.updateAll()
-        self.plotAll(False,xMin,xMax)
+        self.index = 0
         self.crosshair.signal.emit((None,None))
 
     #----------------------------------------------------------------------
-    def loadData(self, datas):
+    def loadData(self, datas, sigs = None):
         """
         载入pandas.DataFrame数据
         datas : 数据格式，cols : datetime, open, close, low, high
@@ -767,8 +790,7 @@ class KLineWidget(KeyWraper):
         # 设置中心点时间
         self.index = 0
         # 绑定数据，更新横坐标映射，更新Y轴自适应函数，更新十字光标映射
-        datas.insert(1,'time_int',np.array(range(len(datas.index))))
-        #datas['time_int'] = np.array(range(len(datas.index)))
+        datas['time_int'] = np.array(range(len(datas.index)))
         self.datas = datas[['open','close','low','high','volume','openInterest']].to_records()
         self.axisTime.xdict={}
         xdict = dict(enumerate(datas.index.tolist()))
@@ -779,6 +801,7 @@ class KLineWidget(KeyWraper):
         self.listHigh         = list(datas['high'])
         self.listLow          = list(datas['low'])
         self.listOpenInterest = list(datas['openInterest'])
+        self.listSig          = [0]*len(self.datas) if sigs is None else sigs
         # 成交量颜色和涨跌同步，K线方向由涨跌决定
         datas0                = pd.DataFrame()
         datas0['open']        = datas.apply(lambda x:0 if x['close'] >= x['open'] else x['volume'],axis=1)  
@@ -789,6 +812,7 @@ class KLineWidget(KeyWraper):
         self.listVol          = datas0[['time_int','open','close','low','high']].to_records(False)
         # 调用画图函数
         self.plotAll(True,0,len(self.datas))
+        self.crosshair.signal.emit((None,None))
 
 ########################################################################
 # 功能测试
