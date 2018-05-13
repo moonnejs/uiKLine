@@ -1,23 +1,24 @@
 # encoding: UTF-8
 import sys,os
-import PyQt4
+import qtpy
 import pyqtgraph as pg
 import datetime as dt          
 import numpy as np
 import traceback
 
-from pyqtgraph.Qt import QtGui, QtCore
+#from pyqtgraph.Qt import QtGui, QtCore
+from qtpy import QtGui, QtCore
 from pyqtgraph.Point import Point
 
 ########################################################################
 # 十字光标支持
 ########################################################################
-class Crosshair(PyQt4.QtCore.QObject):
+class Crosshair(QtCore.QObject):
     """
     此类给pg.PlotWidget()添加crossHair功能,PlotWidget实例需要初始化时传入
     """
-    signal = QtCore.pyqtSignal(type(tuple([])))
-    signalInfo = QtCore.pyqtSignal(float,float)
+    signal = QtCore.Signal(type(tuple([])))
+    signalInfo = QtCore.Signal(float,float)
     #----------------------------------------------------------------------
     def __init__(self,parent,master):
         """Constructor"""
@@ -138,7 +139,7 @@ class Crosshair(PyQt4.QtCore.QObject):
             openInterest    = int(data['openInterest'])
             preClosePrice   = lastdata['close']
             tradePrice      = abs(self.master.listSig[xAxis])
-        except Exception, e:
+        except Exception as e:
             return
             
         if(isinstance(tickDatetime,dt.datetime)):

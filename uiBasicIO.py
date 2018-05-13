@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # PyQt
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4 import QtGui,QtCore
+from qtpy.QtGui import *
+from qtpy.QtWidgets import *
+from qtpy.QtCore import *
+from qtpy import QtGui,QtCore
 # Others
 import os
 import imp
@@ -38,7 +39,7 @@ except AttributeError:
         return s
 
 ########################################################################
-class uiBasicIO(QtGui.QWidget):
+class uiBasicIO(QWidget):
     """通过json文件，自动生成输入框和按钮的元类"""
 
     #----------------------------------------------------------------------
@@ -94,7 +95,7 @@ class uiBasicIO(QtGui.QWidget):
                 className   = setting['class']
                 default     = setting['default']
                 # 标签
-                self.labelDict[name] = QtGui.QLabel(label)
+                self.labelDict[name] = QLabel(label)
                 self.labelDict[name].setAlignment(QtCore.Qt.AlignCenter)
                 # 宽度
                 self.widthDict[name] = width
@@ -108,10 +109,10 @@ class uiBasicIO(QtGui.QWidget):
                     self.classDict[className] = [name]
                 # 输入框
                 if typeName == 'Edit':
-                    self.editDict[name] = QtGui.QLineEdit()
+                    self.editDict[name] = QLineEdit()
                     self.editDict[name].setText(default)
                 elif typeName == 'List':
-                    self.editDict[name] = QtGui.QComboBox()
+                    self.editDict[name] = QComboBox()
                     self.editDict[name].addItems(eval(setting['ListVar']))
 
     #----------------------------------------------------------------------
@@ -126,7 +127,7 @@ class uiBasicIO(QtGui.QWidget):
                 className   = setting['class']
                 style       = setting['style']
                 # 按钮
-                self.buttonDict[func] = QtGui.QPushButton(label)
+                self.buttonDict[func] = QPushButton(label)
                 self.buttonDict[func].setObjectName(_fromUtf8(style))
                 self.buttonDict[func].clicked.connect(partial(BUTTON_FUNC[func],self))
                 # 宽度
@@ -141,9 +142,9 @@ class uiBasicIO(QtGui.QWidget):
     def initBasicUi(self):
         """初始化界面"""
         # 根据配置文件生成输入框界面
-        self.groupInput = QtGui.QGroupBox()
+        self.groupInput = QGroupBox()
         self.groupInput.setTitle(u'')
-        gridup = QtGui.QGridLayout()
+        gridup = QGridLayout()
         i = 0
         for className in self.classDict:
             classIndex = i
@@ -157,22 +158,22 @@ class uiBasicIO(QtGui.QWidget):
                 gridup.setColumnStretch(i, width)
                 i+=1
             # 分类标题
-            qcLabel = QtGui.QLabel(className)
+            qcLabel = QLabel(className)
             qcLabel.setAlignment(QtCore.Qt.AlignCenter)
             qcLabel.setFont(QtGui.QFont("Roman times",10,QtGui.QFont.Bold))
             gridup.addWidget(qcLabel, 0, classIndex,1,i-classIndex)
             # 分隔符
             for j in xrange(0,3):
-                qcSplit = QtGui.QLabel(u'|')
+                qcSplit = QLabel(u'|')
                 qcSplit.setAlignment(QtCore.Qt.AlignCenter)
                 gridup.addWidget(qcSplit, j, i)
             i+=1
         self.groupInput.setLayout(gridup)
 
         # 根据配置文件生成按钮界面
-        self.groupProcess = QtGui.QGroupBox()
+        self.groupProcess = QGroupBox()
         self.groupProcess.setTitle(u'')
-        griddown = QtGui.QGridLayout()
+        griddown = QGridLayout()
         i = 0
         for className in self.bClassDict:
             classIndex = i
@@ -184,13 +185,13 @@ class uiBasicIO(QtGui.QWidget):
                 griddown.setColumnStretch(i, width)
                 i+=1
             # 分类标题
-            qcLabel = QtGui.QLabel(className)
+            qcLabel = QLabel(className)
             qcLabel.setAlignment(QtCore.Qt.AlignCenter)
-            qcLabel.setFont(QtGui.QFont("Roman times",10,QtGui.QFont.Bold))
+            qcLabel.setFont(QFont("Roman times",10,QtGui.QFont.Bold))
             griddown.addWidget(qcLabel, 0, classIndex,1,i-classIndex)
             # 分隔符
             for j in xrange(0,2):
-                qcSplit = QtGui.QLabel(u'|')
+                qcSplit = QLabel(u'|')
                 qcSplit.setAlignment(QtCore.Qt.AlignCenter)
                 griddown.addWidget(qcSplit, j, i)
             i+=1

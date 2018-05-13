@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
+import sip
+sip.setapi("QString", 2)
+sip.setapi("QVariant", 2)
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8')
+import os
+os.environ['QT_API'] = 'pyqt'
 from uiBasicIO import uiBasicIO
 from uiKLine import KLineWidget
 # PyQt
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4 import QtGui,QtCore
+from qtpy.QtGui import *
+from qtpy.QtWidgets import *
+from qtpy.QtCore import *
+from qtpy import QtGui,QtCore
+
 
 import pandas as pd
 
@@ -15,7 +25,7 @@ class uiKLineTool(uiBasicIO):
     """K线回测分析工具"""
 
     dbClient = None
-    signal = QtCore.pyqtSignal(type({}))
+    signal = QtCore.Signal(type({}))
 
     #----------------------------------------------------------------------
     def __init__(self,parent=None):
@@ -72,10 +82,10 @@ class uiKLineTool(uiBasicIO):
     #----------------------------------------------------------------------
     def initUi(self):
         """初始化界面"""
-        hbox = QtGui.QHBoxLayout()
+        hbox = QHBoxLayout()
         hbox.addWidget(self.groupInput)
         hbox.addWidget(self.groupProcess)
-        vbox = QtGui.QVBoxLayout()
+        vbox = QVBoxLayout()
         vbox.addLayout(hbox)
         vbox.addWidget(self.canvas)
         self.setLayout(vbox)

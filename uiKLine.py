@@ -3,20 +3,19 @@
 Python K线模块,包含十字光标和鼠标键盘交互
 Support By 量投科技(http://www.quantdo.com.cn/)
 """
-
-
-# Qt相关和十字光标
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4 import QtGui,QtCore
-from uiCrosshair import Crosshair
-import pyqtgraph as pg
-# 其他
+import traceback
 import numpy as np
 import pandas as pd
 from functools import partial
-from datetime import datetime,timedelta
 from collections import deque
+
+from qtpy.QtGui import *
+from qtpy.QtCore import *
+from qtpy.QtWidgets import *
+from qtpy import QtGui,QtCore
+from uiCrosshair import Crosshair
+import pyqtgraph as pg
+
 
 
 # 字符串转换
@@ -30,12 +29,12 @@ except AttributeError:
 ########################################################################
 # 键盘鼠标功能
 ########################################################################
-class KeyWraper(QtGui.QWidget):
+class KeyWraper(QWidget):
     """键盘鼠标功能支持的元类"""
     #初始化
     #----------------------------------------------------------------------
     def __init__(self, parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QWidget.__init__(self, parent)
         self.setMouseTracking(True)
 
     #重载方法keyPressEvent(self,event),即按键按下事件方法
@@ -74,10 +73,7 @@ class KeyWraper(QtGui.QWidget):
     #重载方法wheelEvent(self,event),即滚轮事件方法
     #----------------------------------------------------------------------
     def wheelEvent(self, event):
-        if event.delta() > 0:
-            self.onUp()
-        else:
-            self.onDown()
+        return
 
     #重载方法paintEvent(self,event),即拖动事件方法
     #----------------------------------------------------------------------
@@ -243,12 +239,12 @@ class CandlestickItem(pg.GraphicsObject):
         bBrush = self.bBrush
         rPen   = self.rPen
         rBrush = self.rBrush
-        low,high = (data[0]['low'],data[0]['high']) if len(data)>0 else (0,1)
+        self.low,self.high = (np.min(data['low']),np.max(data['high'])) if len(data)>0 else (0,1)
+        npic = len(self.pictures)
         for (t, open0, close0, low0, high0) in data:
-            if t >= len(self.pictures):
+            if t >= npic:
                 picture = QtGui.QPicture()
                 p = QtGui.QPainter(picture)
-                low,high = (min(low,low0),max(high,high0))
                 # 下跌蓝色（实心）, 上涨红色（空心）
                 pen,brush,pmin,pmax = (bPen,bBrush,close0,open0)\
                     if open0 > close0 else (rPen,rBrush,open0,close0)
@@ -265,7 +261,6 @@ class CandlestickItem(pg.GraphicsObject):
                     p.drawLine(QtCore.QPointF(t,pmax), QtCore.QPointF(t, high0))
                 p.end()
                 self.pictures.append(picture)
-        self.low,self.high = low,high
 
     # 手动重画
     #----------------------------------------------------------------------
@@ -288,8 +283,8 @@ class CandlestickItem(pg.GraphicsObject):
     # 缓存图片
     #----------------------------------------------------------------------
     def createPic(self,xmin,xmax):
-        picture = QtGui.QPicture()
-        p = QtGui.QPainter(picture)
+        picture = QPicture()
+        p = QPainter(picture)
         [pic.play(p) for pic in self.pictures[xmin:xmax]]
         p.end()
         return picture
@@ -386,7 +381,7 @@ class KLineWidget(KeyWraper):
         # 注册十字光标
         self.crosshair = Crosshair(self.pw,self)
         # 设置界面
-        self.vb = QtGui.QVBoxLayout()
+        self.vb = QVBoxLayout()
         self.vb.addWidget(self.pw)
         self.setLayout(self.vb)
         # 初始化完成
@@ -464,7 +459,7 @@ class KLineWidget(KeyWraper):
     def plotOI(self,xmin=0,xmax=-1):
         """重画持仓量子图"""
         if self.initCompleted:
-            self.curveOI.setData(self.listOpenInterest[xmin:xmax], pen='w', name="OpenInterest")
+            self.curveOI.setData(np.append(self.listOpenInterest[xmin:xmax],0), pen='w', name="OpenInterest")
 
     #----------------------------------------------------------------------
     def addSig(self,sig,main=True):
@@ -496,12 +491,12 @@ class KLineWidget(KeyWraper):
             for sig in datas:
                 self.addSig(sig,main)
                 self.sigData[sig] = datas[sig]
-                self.sigPlots[sig].setData(datas[sig], pen=self.sigColor[sig][0], name=sig)
+                self.sigPlots[sig].setData(np.append(datas[sig],0), pen=self.sigColor[sig][0], name=sig)
         else:
             for sig in datas:
                 self.addSig(sig,main)
                 self.subSigData[sig] = datas[sig]
-                self.subSigPlots[sig].setData(datas[sig], pen=self.subSigColor[sig][0], name=sig)
+                self.subSigPlots[sig].setData(np.append(datas[sig],0), pen=self.subSigColor[sig][0], name=sig)
 
     #----------------------------------------------------------------------
     def plotMark(self):
@@ -539,7 +534,10 @@ class KLineWidget(KeyWraper):
             vRange = view.viewRange()
             xmin = max(0,int(vRange[0][0]))
             xmax = max(0,int(vRange[0][1]))
-            xmax = min(xmax,len(datas))
+            try:
+                xmax = min(xmax,len(datas)-1)
+            except:
+                xmax = xmax
             if len(datas)>0 and xmax > xmin:
                 ymin = min(datas[xmin:xmax][low])
                 ymax = max(datas[xmin:xmax][high])
@@ -556,9 +554,9 @@ class KLineWidget(KeyWraper):
         redraw ：False=重画最后一根K线; True=重画所有
         xMin,xMax : 数据范围
         """
-        xMax = len(self.datas) if xMax < 0 else xMax
-        self.countK = xMax-xMin
-        self.index = int((xMax+xMin)/2)
+        xMax = len(self.datas)-1 if xMax < 0 else xMax
+        #self.countK = xMax-xMin
+        #self.index = int((xMax+xMin)/2)
         self.pwOI.setLimits(xMin=xMin,xMax=xMax)
         self.pwKL.setLimits(xMin=xMin,xMax=xMax)
         self.pwVol.setLimits(xMin=xMin,xMax=xMax)
@@ -575,7 +573,10 @@ class KLineWidget(KeyWraper):
         datas   = self.datas
         minutes = int(self.countK/2)
         xmin    = max(0,self.index-minutes)
-        xmax    = xmin+2*minutes
+        try:
+            xmax    = min(xmin+2*minutes,len(self.datas)-1) if self.datas else xmin+2*minutes
+        except:
+            xmax    = xmin+2*minutes
         self.pwOI.setRange(xRange = (xmin,xmax))
         self.pwKL.setRange(xRange = (xmin,xmax))
         self.pwVol.setRange(xRange = (xmin,xmax))
@@ -587,8 +588,8 @@ class KLineWidget(KeyWraper):
         """跳转到下一个开平仓点"""
         if len(self.listSig)>0 and not self.index is None:
             datalen = len(self.listSig)
-            self.index+=1
-            while self.index < datalen and self.listSig[self.index] == 0:
+            if self.index < datalen-2 : self.index+=1
+            while self.index < datalen-2 and self.listSig[self.index] == 0:
                 self.index+=1
             self.refresh()
             x = self.index
@@ -599,7 +600,7 @@ class KLineWidget(KeyWraper):
     def onPre(self):
         """跳转到上一个开平仓点"""
         if  len(self.listSig)>0 and not self.index is None:
-            self.index-=1
+            if self.index > 0: self.index-=1
             while self.index > 0 and self.listSig[self.index] == 0:
                 self.index-=1
             self.refresh()
@@ -615,6 +616,7 @@ class KLineWidget(KeyWraper):
         if len(self.datas)>0:
             x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
             x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
+            x = len(self.datas)-1 if x > len(self.datas)-1 else int(x)
             y = self.datas[x][2]
             self.crosshair.signal.emit((x,y))
 
@@ -626,6 +628,7 @@ class KLineWidget(KeyWraper):
         if len(self.datas)>0:
             x = self.index-self.countK/2+2 if int(self.crosshair.xAxis)<self.index-self.countK/2+2 else int(self.crosshair.xAxis)
             x = self.index+self.countK/2-2 if x>self.index+self.countK/2-2 else x
+            x = len(self.datas)-1 if x > len(self.datas)-1 else int(x)
             y = self.datas[x]['close']
             self.crosshair.signal.emit((x,y))
 
@@ -634,6 +637,7 @@ class KLineWidget(KeyWraper):
         """向左移动"""
         if len(self.datas)>0 and int(self.crosshair.xAxis)>2:
             x = int(self.crosshair.xAxis)-1
+            x = len(self.datas)-1 if x > len(self.datas)-1 else int(x)
             y = self.datas[x]['close']
             if x <= self.index-self.countK/2+2 and self.index>1:
                 self.index -= 1
@@ -645,6 +649,7 @@ class KLineWidget(KeyWraper):
         """向右移动"""
         if len(self.datas)>0 and int(self.crosshair.xAxis)<len(self.datas)-1:
             x = int(self.crosshair.xAxis)+1
+            x = len(self.datas)-1 if x > len(self.datas)-1 else int(x)
             y = self.datas[x]['close']
             if x >= self.index+int(self.countK/2)-2:
                 self.index += 1
@@ -674,6 +679,7 @@ class KLineWidget(KeyWraper):
             if len(datas)>0 and xmax > xmin:
                 ymin = min(datas[xmin:xmax][low])
                 ymax = max(datas[xmin:xmax][high])
+                ymin,ymax = (-1,1) if ymin==ymax else (ymin,ymax)
                 self.setRange(yRange = (ymin,ymax))
             else:
                 self.setRange(yRange = (0,1))
@@ -725,23 +731,21 @@ class KLineWidget(KeyWraper):
         self.plotMark()
 
     #----------------------------------------------------------------------
-    def onBar(self, bar, sig = 0, nWindow = 20):
+    def onBar(self, bar):
         """
         新增K线数据,K线播放模式
-        nWindow : 最大数据窗口
         """
         # 是否需要更新K线
         newBar = False if len(self.datas)>0 and bar.datetime==self.datas[-1].datetime else True
         nrecords = len(self.datas) if newBar else len(self.datas)-1
         bar.openInterest = np.random.randint(0,3) if bar.openInterest==np.inf or bar.openInterest==-np.inf else bar.openInterest
-        recordVol = (nrecords,bar.volume,0,0,bar.volume) if bar.close < bar.open else (nrecords,0,bar.volume,0,bar.volume)
+        recordVol = (nrecords,abs(bar.volume),0,0,abs(bar.volume)) if bar.close < bar.open else (nrecords,0,abs(bar.volume),0,abs(bar.volume))
 
         if newBar and any(self.datas):
             self.datas.resize(nrecords+1,refcheck=0)
             self.listBar.resize(nrecords+1,refcheck=0)
             self.listVol.resize(nrecords+1,refcheck=0)
         elif any(self.datas):
-            self.listSig.pop()
             self.listLow.pop()
             self.listHigh.pop()
             self.listOpenInterest.pop()
@@ -750,7 +754,7 @@ class KLineWidget(KeyWraper):
             self.listBar[-1] = (nrecords, bar.open, bar.close, bar.low, bar.high)
             self.listVol[-1] = recordVol
         else:
-            self.datas     = np.rec.array([(datetime, bar.open, bar.close, bar.low, bar.high, bar.volume, bar.openInterest)],\
+            self.datas     = np.rec.array([(bar.datetime, bar.open, bar.close, bar.low, bar.high, bar.volume, bar.openInterest)],\
                                         names=('datetime','open','close','low','high','volume','openInterest'))
             self.listBar   = np.rec.array([(nrecords, bar.open, bar.close, bar.low, bar.high)],\
                                      names=('time_int','open','close','low','high'))
@@ -758,19 +762,11 @@ class KLineWidget(KeyWraper):
             self.resignData(self.datas)
 
         self.axisTime.update_xdict({nrecords:bar.datetime})
-        self.listSig.append(sig)
         self.listLow.append(bar.low)
         self.listHigh.append(bar.high)
         self.listOpenInterest.append(bar.openInterest)
         self.resignData(self.datas)
-        nWindow0 = min(nrecords,nWindow)
-        xMax = nrecords+2
-        xMin = max(0,nrecords-nWindow0)
-        self.plotAll(False,xMin,xMax)
-        if not newBar:
-            self.updateAll()
-        self.index = 0
-        self.crosshair.signal.emit((None,None))
+        return newBar
 
     #----------------------------------------------------------------------
     def loadData(self, datas, sigs = None):
@@ -779,7 +775,6 @@ class KLineWidget(KeyWraper):
         datas : 数据格式，cols : datetime, open, close, low, high
         """
         # 设置中心点时间
-        self.index = 0
         # 绑定数据，更新横坐标映射，更新Y轴自适应函数，更新十字光标映射
         datas['time_int'] = np.array(range(len(datas.index)))
         self.datas = datas[['open','close','low','high','volume','openInterest']].to_records()
@@ -792,7 +787,7 @@ class KLineWidget(KeyWraper):
         self.listHigh         = list(datas['high'])
         self.listLow          = list(datas['low'])
         self.listOpenInterest = list(datas['openInterest'])
-        self.listSig          = [0]*len(self.datas) if sigs is None else sigs
+        self.listSig          = [0]*(len(self.datas)-1) if sigs is None else sigs
         # 成交量颜色和涨跌同步，K线方向由涨跌决定
         datas0                = pd.DataFrame()
         datas0['open']        = datas.apply(lambda x:0 if x['close'] >= x['open'] else x['volume'],axis=1)  
@@ -801,8 +796,17 @@ class KLineWidget(KeyWraper):
         datas0['high']        = datas['volume']
         datas0['time_int']    = np.array(range(len(datas.index)))
         self.listVol          = datas0[['time_int','open','close','low','high']].to_records(False)
+
+    #----------------------------------------------------------------------
+    def refreshAll(self, redraw=True, update=False):
+        """
+        更新所有界面
+        """
         # 调用画图函数
-        self.plotAll(True,0,len(self.datas))
+        self.index = len(self.datas)
+        self.plotAll(redraw,0,len(self.datas))
+        if not update:
+            self.updateAll()
         self.crosshair.signal.emit((None,None))
 
 ########################################################################
@@ -822,4 +826,5 @@ if __name__ == '__main__':
     ui.show()
     ui.KLtitle.setText('rb1701',size='20pt')
     ui.loadData(pd.DataFrame.from_csv('data.csv'))
+    ui.refreshAll()
     app.exec_()
